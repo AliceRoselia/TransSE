@@ -62,7 +62,7 @@ class attentionBlock(nn.Module):
         
         attention_outputs = self.attention(attention_inputs)
         
-        result = attention_outputs.view(-1,self.n_total)
+        result = func.sigmoid(attention_outputs.view(-1,self.n_total))
         
         return x*result[:,:,None,None]
         
