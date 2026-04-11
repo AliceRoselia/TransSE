@@ -11,6 +11,8 @@ import torch.nn.functional as func
 
 torch.manual_seed(42)
 
+torch.set_float32_matmul_precision("high")
+
 #TransSEnet for medical imaging and similar tasks.
 
 
@@ -29,9 +31,9 @@ class residualBlock(nn.Module):
 class convBlock(nn.Module):
     def __init__(self,n):
         super(convBlock,self).__init__()
-        self.submodule = nn.Conv2d(n, n, (3,3))
+        self.submodule = nn.Conv2d(n, n, (3,3),padding="same")
     def forward(self,x):
-        return self.submodule(x)
+        return func.relu(self.submodule(x))
         # Main convnet block.
         #I am not sure
         
@@ -39,27 +41,28 @@ class convBlock(nn.Module):
 #https://pytorch.org/blog/flexattention-flashattention-4-fast-and-flexible/ in case you need 
 #a flexible attention.
 class attentionBlock(nn.Module):
-    def __init__(self,n,attention_vector_size = 8,n_hidden_multiplier=4,nhead = 8):
+    def __init__(self,n,attention_vector_size = 16,n_hidden_multiplier=4,nhead = 8):
         
         super(attentionBlock,self).__init__()
-        self.proj_kernel = nn.Conv2d(n, n*attention_vector_size*3, (1,1))
+        
+        assert n % attention_vector_size == 0
         
         #We need
         
-        self.n = n
+        self.n = n//attention_vector_size
         self.attention_vector_size = attention_vector_size
+        self.n_total = n
+        self.attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True)
         
     def forward(self,x):
-        x = self.proj_kernel(x)
         
-        attention_inputs = x.mean((1,2)).view(-1,self.n*3,self.attention_vector_size)
-        q,k,v = attention_inputs[:,:self.n,:], attention_inputs[:,self.n:self.n*2,:], attention_inputs[:,self.n*2:,:]
+        attention_inputs = x.mean((2,3)).view(-1,self.n,self.attention_vector_size)
         
-        #Working in progress. Raise the error for now.
+        attention_outputs = self.attention(attention_inputs)
         
-        result = None
+        result = attention_outputs.view(-1,self.n_total)
         
-        return x*result[:,None,None,:]
+        return x*result[:,:,None,None]
         
     
 class TransSEBlock(nn.Module):
@@ -69,3 +72,13 @@ class TransSEBlock(nn.Module):
         self.attentionBlock = attentionBlock(n)
     def forward(self,x):
         return self.attentionBlock(self.mainConvBlock(x))
+    
+channel_count = 256
+
+Test_block = residualBlock(TransSEBlock(channel_count)).to("cuda")
+
+Test_data = torch.randn(32,channel_count,224,224).to("cuda")
+
+print("Try running the model.")
+
+result = Test_block(Test_data)
