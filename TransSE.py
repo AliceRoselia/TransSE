@@ -13,6 +13,8 @@ torch.manual_seed(42)
 
 torch.set_float32_matmul_precision("high")
 
+from time import time
+
 #TransSEnet for medical imaging and similar tasks.
 
 
@@ -81,4 +83,8 @@ Test_data = torch.randn(32,channel_count,224,224).to("cuda")
 
 print("Try running the model.")
 
+start = time()
+
 result = Test_block(Test_data)
+
+print(time()-start)
