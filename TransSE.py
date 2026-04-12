@@ -34,9 +34,9 @@ class convBlock(nn.Module):
     def __init__(self,n):
         super(convBlock,self).__init__()
         self.submodule = nn.Conv2d(n, n, (3,3),padding="same")
+        self.batchnorm = nn.BatchNorm2d(n)
     def forward(self,x):
-        #Grok suggested adding batchnorm here. Maybe try later.
-        return func.relu(self.submodule(x))
+        return self.batchnorm(func.relu(self.submodule(x)))
         # Main convnet block.
         #I am not sure
         
@@ -44,7 +44,7 @@ class convBlock(nn.Module):
 #https://pytorch.org/blog/flexattention-flashattention-4-fast-and-flexible/ in case you need 
 #a flexible attention.
 class attentionBlock(nn.Module):
-    def __init__(self,n,attention_vector_size = 16,n_hidden_multiplier=4,nhead = 8):
+    def __init__(self,n,attention_vector_size = 16,n_hidden_multiplier=4,nhead = 8,nlayer=8):
         
         super(attentionBlock,self).__init__()
         
@@ -56,7 +56,8 @@ class attentionBlock(nn.Module):
         self.attention_vector_size = attention_vector_size
         self.n_total = n
         #Grok suggested using norm_first = True. Let's try later. However, given that batchnorm was already used before during the conv layer, I'm not sure.
-        self.attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True)
+        attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True)
+        self.attention = nn.TransformerEncoder(attention,num_layers = nlayer)
         
     def forward(self,x):
         
