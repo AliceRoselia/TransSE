@@ -82,7 +82,7 @@ channel_count = 256
 
 Test_block = residualBlock(TransSEBlock(channel_count)).to("cuda")
 
-Test_data = torch.randn(32,channel_count,224,224).to("cuda")
+Test_data = torch.randn(16,channel_count,224,224).to("cuda")
 
 print("Try running the model.")
 
