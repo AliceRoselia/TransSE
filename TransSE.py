@@ -38,13 +38,15 @@ class convBlock(nn.Module):
     def forward(self,x):
         return self.batchnorm(func.relu(self.submodule(x)))
         # Main convnet block.
-        #I am not sure
+        #I am not sure whether to put batchnorm before or after relu. The original literature ix mixed.
+        #It's said that batchnorm after relu performs a bit better, which makes sense given that is the "bias" is literally the point before doing relu.
+        #Regardless, there is little difference because batchnorm cares about covariate shift which only accumulates after several layers.
         
         
 #https://pytorch.org/blog/flexattention-flashattention-4-fast-and-flexible/ in case you need 
 #a flexible attention.
 class attentionBlock(nn.Module):
-    def __init__(self,n,attention_vector_size = 16,n_hidden_multiplier=4,nhead = 8,nlayer=8):
+    def __init__(self,n,attention_vector_size = 16,n_hidden_multiplier=4,nhead = 8,nlayer=3):
         
         super(attentionBlock,self).__init__()
         
@@ -55,7 +57,7 @@ class attentionBlock(nn.Module):
         self.n = n//attention_vector_size
         self.attention_vector_size = attention_vector_size
         self.n_total = n
-        #Grok suggested using norm_first = True. Let's try later. However, given that batchnorm was already used before during the conv layer, I'm not sure.
+        #Also try using norm_first = True. Let's try later. However, given that batchnorm was already used before during the conv layer, I'm not sure.
         attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True)
         self.attention = nn.TransformerEncoder(attention,num_layers = nlayer)
         
@@ -91,3 +93,19 @@ start = time()
 result = Test_block(Test_data)
 
 print(time()-start)
+
+
+
+#Grid search hyperparameters:
+    #Batch norms:
+        
+        #Batch norm before or after relu.
+        #Batch norm before or after attention.
+        
+#This architecture is chosen first because it's easier to implement.
+#The one I'd like to also try would be a "squeeze-and-attend" mechanism 
+#where the query and key are from the squeeze but the attention values are 
+#from image themselves (Don't throw away spatial information).
+#This means squeezing the query and key to form "channel group query"
+# and "channel group key" while the value remains unsqueezed into channels.
+#It represents how channels attend to other channels.
