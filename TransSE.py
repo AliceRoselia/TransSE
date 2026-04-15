@@ -9,11 +9,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
-torch.manual_seed(42)
+torch.manual_seed(44542)
 
 torch.set_float32_matmul_precision("high")
 
@@ -61,7 +61,7 @@ class attentionBlock(nn.Module):
         self.attention_vector_size = attention_vector_size
         self.n_total = n
         #Also try using norm_first = True. Let's try later. However, given that batchnorm was already used before during the conv layer, I'm not sure.
-        attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True)
+        attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True, activation = "relu")
         self.attention = nn.TransformerEncoder(attention,num_layers = nlayer)
         
     def forward(self,x):
@@ -83,35 +83,34 @@ class TransSEBlock(nn.Module):
     def forward(self,x):
         return self.attentionBlock(self.mainConvBlock(x))
     
-channel_count = 256
 batch_size = 32
 
 
 
-train_data = RetinaMNIST(split="train",transform = transforms.ToTensor(),download=True,size = 224)
+train_data = BreastMNIST(split="train",transform = transforms.ToTensor(),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
 class TransSENet(nn.Module):
     def __init__(self, in_channels,classes):
         super(TransSENet,self).__init__()
         self.layers = nn.Sequential(
-            nn.Conv2d(in_channels,64,kernel_size=7),
+            nn.Conv2d(in_channels,64,kernel_size=7,padding="same"),
             nn.ReLU(),
             residualBlock(TransSEBlock(64)),
             residualBlock(TransSEBlock(64)),
             residualBlock(TransSEBlock(64)),
             nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(64,128,kernel_size=3),
+            nn.Conv2d(64,128,kernel_size=3,padding="same"),
             nn.ReLU(),
             residualBlock(TransSEBlock(128)),
             residualBlock(TransSEBlock(128)),
             residualBlock(TransSEBlock(128)),
             residualBlock(TransSEBlock(128)),
             nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(128,256,kernel_size=3),
+            nn.Conv2d(128,256,kernel_size=3,padding="same"),
             nn.ReLU(),
             residualBlock(TransSEBlock(256)),
             residualBlock(TransSEBlock(256)),
@@ -120,24 +119,35 @@ class TransSENet(nn.Module):
             residualBlock(TransSEBlock(256)),
             residualBlock(TransSEBlock(256)),
             nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(256,512,kernel_size=3),
+            nn.Conv2d(256,512,kernel_size=3,padding="same"),
             nn.ReLU(),
             residualBlock(TransSEBlock(512)),
             residualBlock(TransSEBlock(512)),
             residualBlock(TransSEBlock(512)),
             )
+        
         self.results = nn.Linear(512, classes)
     def forward(self,x):
         features = self.layers(x)
         return self.results(features.mean((2,3)))
 
-net = TransSENet(3, 5).to("cuda")
+net = TransSENet(1, 2).to("cuda")
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
+
+#pretrained = torch.load("SEnet.pt")
+
+#del pretrained["layers.0.weight"]
+#del pretrained["layers.0.bias"]
+#del pretrained["results.weight"]
+#del pretrained["results.bias"]
+
+#net.load_state_dict(pretrained,strict=False)
 
 
 current = 0
 for data_input, result in train_data_loader:
+
     print(current)
     current += batch_size
     result = result.to("cuda")
@@ -151,9 +161,11 @@ for data_input, result in train_data_loader:
     
     
     print(result_loss)
-    
+
+
+
 correct = 0
-total = 400
+total = 156
     
 with torch.no_grad():
     
@@ -163,6 +175,8 @@ with torch.no_grad():
         correct += (prediction.argmax(dim=1) == result.view(-1)).sum()
 
 print("accuracy: ",correct / total)
+
+#torch.save(net.state_dict(),"SEnet_breast.pt")
 
 
 #1st epoch: 0.4350 (3,4,6,3 layers)
@@ -182,6 +196,32 @@ print("accuracy: ",correct / total)
 #1st epoch: 0.4975 (3,4,4,4 layers)
 
 #0.5025 (lr = 2e-4)
+
+#The retina mnist maxes out at about 50%. It's a weird one. Let's try something else.
+# Breast mnist.
+
+# 0.7949
+
+# Gelu yielded worse result at 0.7692
+
+# With lower lr (1.2). 0.7692
+
+# With fewer attention blocks: 0.7692
+
+# With even fewer attention blocks: 0.7756
+
+# Try MNIST with a bit more data: blood mnist.
+
+# 0.9336
+
+#Pretrained with blood mnist on Breast MNIST: 0.8077
+
+#Breast mnist without SE net: 0.6731
+
+# With increased learning rate (1e-3): 0.7372
+
+#The SEnet yielded a significant improvement.
+
 
 
 
