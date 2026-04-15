@@ -175,6 +175,14 @@ print("accuracy: ",correct / total)
 
 #1st epoch: 0.5425 (Learning rate = 1.5e-4).
 
+#1st epoch: 0.5250 (3,4,8,4 layers)
+
+#Adjust padding policy to "same": 0.4775
+
+#1st epoch: 0.4975 (3,4,4,4 layers)
+
+#0.5025 (lr = 2e-4)
+
 
 
 #Grid search hyperparameters:
