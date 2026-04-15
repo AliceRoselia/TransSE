@@ -90,6 +90,9 @@ batch_size = 32
 train_data = BreastMNIST(split="train",transform = transforms.ToTensor(),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True)
+
 test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
@@ -125,11 +128,12 @@ class TransSENet(nn.Module):
             residualBlock(TransSEBlock(512)),
             residualBlock(TransSEBlock(512)),
             )
+        self.dropout = nn.Dropout(0.2)
         
         self.results = nn.Linear(512, classes)
     def forward(self,x):
         features = self.layers(x)
-        return self.results(features.mean((2,3)))
+        return self.results(self.dropout(features.mean((2,3))))
 
 net = TransSENet(1, 2).to("cuda")
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
@@ -144,24 +148,43 @@ loss = nn.CrossEntropyLoss()
 
 #net.load_state_dict(pretrained,strict=False)
 
+best = 0
 
-current = 0
-for data_input, result in train_data_loader:
-
-    print(current)
-    current += batch_size
-    result = result.to("cuda")
-    prediction = net(data_input.to("cuda"))
-    result_loss = loss(prediction,result.view(-1))
-    result_loss.backward()
+for epoch in range(100):
     
-    optimizer.step()
-    optimizer.zero_grad()
+    current = 0
     
+    for data_input, result in train_data_loader:
     
+        print(current)
+        current += batch_size
+        result = result.to("cuda")
+        prediction = net(data_input.to("cuda")*torch.rand(data_input.shape,device="cuda"))
+        result_loss = loss(prediction,result.view(-1))
+        result_loss.backward()
+        
+        optimizer.step()
+        optimizer.zero_grad()
+        
+        
+        
+        print(result_loss)
     
-    print(result_loss)
-
+    correct = 0
+    with torch.no_grad():
+        for data_input, result in val_data_loader:
+            result = result.to("cuda")
+            prediction = net(data_input.to("cuda")*0.5)
+            correct += (prediction.argmax(dim=1) == result.view(-1)).sum()
+    
+    print("correct:",correct)
+    if correct > best:
+        best = correct
+        print("New frontier reached.")
+        torch.save(net.state_dict(),"SEnet_breast_2_100epochs.pt")
+    
+pretrained = torch.load("SEnet_breast_2_100epochs.pt")
+net.load_state_dict(pretrained)
 
 
 correct = 0
@@ -171,7 +194,7 @@ with torch.no_grad():
     
     for data_input, result in test_data_loader:
         result = result.to("cuda")
-        prediction = net(data_input.to("cuda"))
+        prediction = net(data_input.to("cuda")*0.5)
         correct += (prediction.argmax(dim=1) == result.view(-1)).sum()
 
 print("accuracy: ",correct / total)
@@ -221,6 +244,8 @@ print("accuracy: ",correct / total)
 # With increased learning rate (1e-3): 0.7372
 
 #The SEnet yielded a significant improvement.
+
+#Breast mnist with multiple epochs: 0.8141
 
 
 
