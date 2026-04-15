@@ -9,11 +9,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
+from medmnist import RetinaMNIST
+import torchvision.transforms as transforms
+import torch.utils.data as data
+
 torch.manual_seed(42)
 
 torch.set_float32_matmul_precision("high")
 
-from time import time
 
 #TransSEnet for medical imaging and similar tasks.
 
@@ -46,7 +49,7 @@ class convBlock(nn.Module):
 #https://pytorch.org/blog/flexattention-flashattention-4-fast-and-flexible/ in case you need 
 #a flexible attention.
 class attentionBlock(nn.Module):
-    def __init__(self,n,attention_vector_size = 16,n_hidden_multiplier=4,nhead = 8,nlayer=3):
+    def __init__(self,n,attention_vector_size = 8,n_hidden_multiplier=8,nhead = 8,nlayer=8):
         
         super(attentionBlock,self).__init__()
         
@@ -81,18 +84,96 @@ class TransSEBlock(nn.Module):
         return self.attentionBlock(self.mainConvBlock(x))
     
 channel_count = 256
+batch_size = 32
 
-Test_block = residualBlock(TransSEBlock(channel_count)).to("cuda")
 
-Test_data = torch.randn(16,channel_count,224,224).to("cuda")
 
-print("Try running the model.")
+train_data = RetinaMNIST(split="train",transform = transforms.ToTensor(),download=True,size = 224)
+train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
-start = time()
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
-result = Test_block(Test_data)
+class TransSENet(nn.Module):
+    def __init__(self, in_channels,classes):
+        super(TransSENet,self).__init__()
+        self.layers = nn.Sequential(
+            nn.Conv2d(in_channels,64,kernel_size=7),
+            nn.ReLU(),
+            residualBlock(TransSEBlock(64)),
+            residualBlock(TransSEBlock(64)),
+            residualBlock(TransSEBlock(64)),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(64,128,kernel_size=3),
+            nn.ReLU(),
+            residualBlock(TransSEBlock(128)),
+            residualBlock(TransSEBlock(128)),
+            residualBlock(TransSEBlock(128)),
+            residualBlock(TransSEBlock(128)),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(128,256,kernel_size=3),
+            nn.ReLU(),
+            residualBlock(TransSEBlock(256)),
+            residualBlock(TransSEBlock(256)),
+            residualBlock(TransSEBlock(256)),
+            residualBlock(TransSEBlock(256)),
+            residualBlock(TransSEBlock(256)),
+            residualBlock(TransSEBlock(256)),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(256,512,kernel_size=3),
+            nn.ReLU(),
+            residualBlock(TransSEBlock(512)),
+            residualBlock(TransSEBlock(512)),
+            residualBlock(TransSEBlock(512)),
+            )
+        self.results = nn.Linear(512, classes)
+    def forward(self,x):
+        features = self.layers(x)
+        return self.results(features.mean((2,3)))
 
-print(time()-start)
+net = TransSENet(3, 5).to("cuda")
+optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
+loss = nn.CrossEntropyLoss()
+
+
+current = 0
+for data_input, result in train_data_loader:
+    print(current)
+    current += batch_size
+    result = result.to("cuda")
+    prediction = net(data_input.to("cuda"))
+    result_loss = loss(prediction,result.view(-1))
+    result_loss.backward()
+    
+    optimizer.step()
+    optimizer.zero_grad()
+    
+    
+    
+    print(result_loss)
+    
+correct = 0
+total = 400
+    
+with torch.no_grad():
+    
+    for data_input, result in test_data_loader:
+        result = result.to("cuda")
+        prediction = net(data_input.to("cuda"))
+        correct += (prediction.argmax(dim=1) == result.view(-1)).sum()
+
+print("accuracy: ",correct / total)
+
+
+#1st epoch: 0.4350 (3,4,6,3 layers)
+
+#1st epoch: 0.4500 (3,4,23,8 layers)
+
+#1st epoch: 0.4775 (hidden multiplier doubled and reduced the attention vector to 8)
+
+#1st epoch: 0.5200 (increased the transformer network to 8 layers).
+
+#1st epoch: 0.5425 (Learning rate = 1.5e-4).
 
 
 
