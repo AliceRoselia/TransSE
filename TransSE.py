@@ -128,7 +128,7 @@ class TransSENet(nn.Module):
             residualBlock(TransSEBlock(512)),
             residualBlock(TransSEBlock(512)),
             )
-        self.dropout = nn.Dropout(0.2)
+        self.dropout = nn.Dropout(0.1)
         
         self.results = nn.Linear(512, classes)
     def forward(self,x):
@@ -150,7 +150,7 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-for epoch in range(100):
+for epoch in range(30):
     
     current = 0
     
@@ -181,9 +181,9 @@ for epoch in range(100):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"SEnet_breast_2_100epochs.pt")
+        torch.save(net.state_dict(),"SEnet_breast_3_30epochs.pt")
     
-pretrained = torch.load("SEnet_breast_2_100epochs.pt")
+pretrained = torch.load("SEnet_breast_3_30epochs.pt")
 net.load_state_dict(pretrained)
 
 
@@ -246,6 +246,12 @@ print("accuracy: ",correct / total)
 #The SEnet yielded a significant improvement.
 
 #Breast mnist with multiple epochs: 0.8141
+
+#Breast mnist with 100 epochs of trying: 0.8462
+
+#Breast mnist with 20 epochs of 0.5 dropout: 0.8077
+
+#Breast mnist with 30 epochs of 0.1 dropout: 0.8333
 
 
 
