@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import BreastMNIST
+from medmnist import RetinaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
@@ -87,13 +87,19 @@ batch_size = 32
 
 
 
-train_data = BreastMNIST(split="train",transform = transforms.ToTensor(),download=True,size = 224)
+train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomRotation(15),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
+]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
-val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True)
 
-test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
 class TransSENet(nn.Module):
@@ -135,7 +141,7 @@ class TransSENet(nn.Module):
         features = self.layers(x)
         return self.results(self.dropout(features.mean((2,3))))
 
-net = TransSENet(1, 2).to("cuda")
+net = TransSENet(3, 5).to("cuda")
 net = torch.compile(net)
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
@@ -151,7 +157,7 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-for epoch in range(20):
+for epoch in range(5):
     
     current = 0
     
@@ -184,14 +190,14 @@ for epoch in range(20):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"SEnet_breast_8_20epochs.pt")
+        torch.save(net.state_dict(),"SEnet_retina_few_epochs2.pt")
     
-pretrained = torch.load("SEnet_breast_8_20epochs.pt") #Oops. Only 20 epochs.
+pretrained = torch.load("SEnet_retina_few_epochs2.pt") #Oops. Only 20 epochs.
 net.load_state_dict(pretrained)
 
 
 correct = 0
-total = 156 
+total = 400 
     
 with torch.no_grad():
     
@@ -204,9 +210,15 @@ print("accuracy: ",correct / total)
 
 #torch.save(net.state_dict(),"SEnet_breast.pt")
 
+#Baseline: 
+#Breast mnist: 0.896
+#Retina mnist: 0.561 
+
 
 # Breast mnist 0.8205.
+# Retina mnist 0.5350.
 
+# Retina mnist with non-degenerate attention: 0.4975
 
 
 
