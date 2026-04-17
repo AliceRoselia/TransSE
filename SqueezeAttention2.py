@@ -79,9 +79,9 @@ class SqueezeAttentionBlock(nn.Module):
         channel_reps = x.mean((3,4)) #dimension: B,M,N
         
         query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
-        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,N//self.heads,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head*H*W
+        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,N//self.heads,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
         scale = (N//self.heads) ** -0.5
-        scores = torch.matmul(query, key.transpose(-2, -1)) * scale
+        scores = torch.matmul(query, key.transpose(-2, -1)) * scale #Dimensions B, Head, M, M
         
         attn = func.softmax(scores,dim=-1)
         
