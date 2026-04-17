@@ -78,20 +78,20 @@ class SqueezeAttentionBlock(nn.Module):
         B,M,N,H,W = x.shape
         channel_reps = x.mean((3,4)) #dimension: B,M,N
         
-        query, key = self.qk(channel_reps).view(B,self.heads,M//self.heads,N*2).chunk(2,dim=3) #Dimensions B,Head,M/H,N 
-        value = self.value_conv(x.view(B*M,N,H,W)).view(B,self.heads,M//self.heads,N,H,W) #Dimensions: B,Head,M/H,N*H*W
-        scale = N ** -0.5
+        query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
+        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,N//self.heads,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head*H*W
+        scale = (N//self.heads) ** -0.5
         scores = torch.matmul(query, key.transpose(-2, -1)) * scale
         
         attn = func.softmax(scores,dim=-1)
         
-        attention_result = attention_result = torch.einsum('baij,bajchw -> baichw', attn, value)
+        attention_result = attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
         
         #Manual attention result because optimized kernels weren't optimized for this.
         
        #with sdpa_kernel(backends=[SDPBackend.MATH]):
             #attention_result = func.scaled_dot_product_attention(query,key,value).view(B,M,N,H,W)
-        attention_result = attention_result.view(B,M,N,H,W) + x
+        attention_result = attention_result.reshape(B,M,N,H,W) + x
         attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
         
         attention_result = self.bn2((attention_result + func.relu(self.conv(attention_result))).view(B,M*N,H,W))
@@ -111,30 +111,30 @@ class SqueezeAttention(nn.Module):
     def __init__(self,in_channels,classes):
         super(SqueezeAttention,self).__init__()
         self.intro = nn.Conv2d(in_channels,512,kernel_size=7,padding="same")
-        self.SAB1 = SqueezeAttentionBlock(32, 16)
-        self.SAB2 = SqueezeAttentionBlock(32, 16)
-        #self.SAB3 = SqueezeAttentionBlock(64, 32)
+        self.SAB1 = SqueezeAttentionBlock(8, 64)
+        self.SAB2 = SqueezeAttentionBlock(8, 64)
+        #self.SAB3 = SqueezeAttentionBlock(8, 64)
         
-        self.SAB4 = SqueezeAttentionBlock(32, 16)
-        self.SAB5 = SqueezeAttentionBlock(32, 16)
-        self.SAB6 = SqueezeAttentionBlock(32, 16)
-        self.SAB7 = SqueezeAttentionBlock(32, 16)
+        self.SAB4 = SqueezeAttentionBlock(8, 64)
+        self.SAB5 = SqueezeAttentionBlock(8, 64)
+        self.SAB6 = SqueezeAttentionBlock(8, 64)
+        self.SAB7 = SqueezeAttentionBlock(8, 64)
         
-        self.SAB8 = SqueezeAttentionBlock(32, 16)
-        self.SAB9 = SqueezeAttentionBlock(32, 16)
-        self.SAB10 = SqueezeAttentionBlock(32, 16)
-        self.SAB11 = SqueezeAttentionBlock(32, 16)
-        self.SAB12 = SqueezeAttentionBlock(32, 16)
-        self.SAB13 = SqueezeAttentionBlock(32, 16)
+        self.SAB8 = SqueezeAttentionBlock(8, 64)
+        self.SAB9 = SqueezeAttentionBlock(8, 64)
+        self.SAB10 = SqueezeAttentionBlock(8, 64)
+        self.SAB11 = SqueezeAttentionBlock(8, 64)
+        self.SAB12 = SqueezeAttentionBlock(8, 64)
+        self.SAB13 = SqueezeAttentionBlock(8, 64)
         
-        self.SAB14 = SqueezeAttentionBlock(32, 16)
-        self.SAB15 = SqueezeAttentionBlock(32, 16)
-        self.SAB16 = SqueezeAttentionBlock(32, 16)
-        self.SAB17 = SqueezeAttentionBlock(32, 16)
-        self.SAB18 = SqueezeAttentionBlock(32, 16)
-        self.SAB19 = SqueezeAttentionBlock(32, 16)
-        self.SAB20 = SqueezeAttentionBlock(32, 16)
-        self.SAB21 = SqueezeAttentionBlock(32, 16)
+        self.SAB14 = SqueezeAttentionBlock(8, 64)
+        self.SAB15 = SqueezeAttentionBlock(8, 64)
+        self.SAB16 = SqueezeAttentionBlock(8, 64)
+        self.SAB17 = SqueezeAttentionBlock(8, 64)
+        self.SAB18 = SqueezeAttentionBlock(8, 64)
+        self.SAB19 = SqueezeAttentionBlock(8, 64)
+        self.SAB20 = SqueezeAttentionBlock(8, 64)
+        self.SAB21 = SqueezeAttentionBlock(8, 64)
         
         self.dropout = nn.Dropout(0.5)
         
@@ -142,7 +142,7 @@ class SqueezeAttention(nn.Module):
     
     def forward(self,x):
         B,C,H,W = x.shape
-        x = self.intro(x).view(B,32,16,H,W)
+        x = self.intro(x).view(B,8,64,H,W)
         x = self.SAB1(x)
         x = self.SAB2(x)
         #x = self.SAB3(x)
@@ -226,9 +226,9 @@ for epoch in range(10):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention_2.pt")
+        torch.save(net.state_dict(),"Breast_SqueezeAttention2_1.pt")
     
-pretrained = torch.load("Breast_SqueezeAttention_2.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Breast_SqueezeAttention2_1.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
