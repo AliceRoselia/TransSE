@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
@@ -49,28 +49,30 @@ class convBlock(nn.Module):
 #https://pytorch.org/blog/flexattention-flashattention-4-fast-and-flexible/ in case you need 
 #a flexible attention.
 class attentionBlock(nn.Module):
-    def __init__(self,n,attention_vector_size = 8,n_hidden_multiplier=8,nhead = 8,nlayer=2):
+    def __init__(self,n,n_hidden_multiplier=4):
         
         super(attentionBlock,self).__init__()
         
-        assert n % attention_vector_size == 0
-        
+        n_hidden = n*n_hidden_multiplier
         #We need
+        self.attention = nn.Sequential(
+            nn.Linear(n, n_hidden),
+            nn.ReLU(),
+            nn.Linear(n_hidden, n_hidden),
+            nn.ReLU(),
+            nn.Linear(n_hidden, n_hidden),
+            nn.ReLU(),
+            nn.Linear(n_hidden, n),
+            )
         
-        self.n = n//attention_vector_size
-        self.attention_vector_size = attention_vector_size
-        self.n_total = n
-        #Also try using norm_first = True. Let's try later. However, given that batchnorm was already used before during the conv layer, I'm not sure.
-        attention = nn.TransformerEncoderLayer(d_model=self.attention_vector_size, nhead=nhead,dim_feedforward = self.attention_vector_size*n_hidden_multiplier, batch_first=True, activation = "relu")
-        self.attention = nn.TransformerEncoder(attention,num_layers = nlayer)
         
     def forward(self,x):
         
-        attention_inputs = x.mean((2,3)).view(-1,self.n,self.attention_vector_size)
+        attention_inputs = x.mean((2,3))
         
         attention_outputs = self.attention(attention_inputs)
         
-        result = func.sigmoid(attention_outputs.view(-1,self.n_total))
+        result = func.sigmoid(attention_outputs)
         
         return x*result[:,:,None,None]
         
@@ -87,7 +89,7 @@ batch_size = 32
 
 
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -96,10 +98,10 @@ train_data = RetinaMNIST(split="train",transform = transforms.Compose([
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
 class TransSENet(nn.Module):
@@ -141,7 +143,7 @@ class TransSENet(nn.Module):
         features = self.layers(x)
         return self.results(self.dropout(features.mean((2,3))))
 
-net = TransSENet(3, 5).to("cuda")
+net = TransSENet(1, 2).to("cuda")
 net = torch.compile(net)
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
@@ -157,7 +159,7 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-for epoch in range(5):
+for epoch in range(10):
     
     current = 0
     
@@ -190,14 +192,14 @@ for epoch in range(5):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"SEnet_retina_few_epochs2.pt")
+        torch.save(net.state_dict(),"SEnet_breast_few_epochs2.pt")
     
-pretrained = torch.load("SEnet_retina_few_epochs2.pt") #Oops. Only 20 epochs.
+pretrained = torch.load("SEnet_breast_few_epochs2.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
 correct = 0
-total = 400 
+total = 156 
     
 with torch.no_grad():
     
@@ -214,11 +216,15 @@ print("accuracy: ",correct / total)
 #Breast mnist: 0.896
 #Retina mnist: 0.561 
 
+#Retina mnist with 4-layer SEnet alone: 0.5400
+#Breast mnist with 4-layer SEnet alone: 0.8333
+#Admittedly, it uses 63M parameters. However, considering more params doesn't automatically equal better,
+#this is a good performance.
+#It also trains in 5 epochs.
+#10 epochs for breastmnist.
+#Beats most models except medvit medium and large.
 
-# Breast mnist 0.8205.
-# Retina mnist 0.5350.
-
-# Retina mnist with non-degenerate attention: 0.4975
+#SEnet_retina_few_epochs2 and SEnet_breast_few_epochs2
 
 
 
