@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import BreastMNIST
+from medmnist import RetinaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
@@ -43,7 +43,7 @@ class residualBlock(nn.Module):
 batch_size = 16
 
 
-train_data = BreastMNIST(split="train",transform = transforms.Compose([
+train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -52,10 +52,10 @@ train_data = BreastMNIST(split="train",transform = transforms.Compose([
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
-val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True)
 
-test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
 
@@ -196,7 +196,7 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(1, 2).to("cuda")
+net = SqueezeAttention(3, 5).to("cuda")
 #net = torch.compile(net)
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
@@ -248,14 +248,14 @@ for epoch in range(10):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention5_1.pt")
+        torch.save(net.state_dict(),"Retina_SqueezeAttention1_1.pt")
     
-pretrained = torch.load("Breast_SqueezeAttention5_1.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
 correct = 0
-total = 156 
+total = 400 
     
 with torch.no_grad():
     
@@ -288,5 +288,9 @@ print("accuracy: ",correct / total)
 #On the second thought... After some more training, the 3m params beat the 2m params version.
 #0.8590
 
-#On the other hand, it is very compute-heavy. This one took 102.3(G) MACS compared to 4.14(G) in resnet50. 
+#On the other hand, it is very compute-heavy. This one took 102.3(G) MACS compared to 4.14(G) in resnet50.
+
+#V3 doesn't look so good on the first attempt. 0.7949
+#Try bringing back the max pool. 
+#0.8077
 
