@@ -285,7 +285,7 @@ print("accuracy: ",correct / total)
 # only about 2m parameters.
 #Larger model doesn't seem to help. (About 3m params.)
 #0.8333
-#On the second thought... After some more training.
+#On the second thought... After some more training, the 3m params beat the 2m params version.
 #0.8590
 
 
