@@ -65,7 +65,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     def __init__(self,m,n, head = 4):
         super(SqueezeAttentionBlock,self).__init__()
-        assert m%head == 0
+        assert n%head == 0
         self.channel_group_count = m
         self.qk = nn.Linear(n,2*n)
         self.heads = head
@@ -212,6 +212,9 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
+pretrained = torch.load("Breast_SqueezeAttention4_1.pt")
+net.load_state_dict(pretrained)
+
 for epoch in range(10):
     
     current = 0
@@ -245,9 +248,9 @@ for epoch in range(10):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention3_1.pt")
+        torch.save(net.state_dict(),"Breast_SqueezeAttention4_2.pt")
     
-pretrained = torch.load("Breast_SqueezeAttention3_1.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Breast_SqueezeAttention4_2.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
@@ -279,6 +282,10 @@ print("accuracy: ",correct / total)
 
 #Add up_projection. 
 #0.8333
-# 2m parameters.
+# only about 2m parameters.
+#Larger model doesn't seem to help. (About 3m params.)
+#0.8333
+#After some more tests.
+#0.8590
 
 
