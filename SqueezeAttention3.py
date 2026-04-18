@@ -294,3 +294,5 @@ print("accuracy: ",correct / total)
 #Try bringing back the max pool. 
 #0.8077
 
+#Reverting to the original idea. Now, try Retina mnist.
+
