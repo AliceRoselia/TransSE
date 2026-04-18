@@ -13,7 +13,7 @@ from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
-from torch.nn.attention import SDPBackend, sdpa_kernel
+#from torch.nn.attention import SDPBackend, sdpa_kernel
 
 torch.manual_seed(44542)
 
@@ -72,11 +72,17 @@ class SqueezeAttentionBlock(nn.Module):
         self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
         self.conv = nn.Conv2d(n, n, 3, padding = "same")
+        #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
+    
+    #def convs(self,x):
+        #return self.pw_conv(self.dw_conv(x))
+    
     def forward(self,x):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
         channel_reps = x.mean((3,4)) #dimension: B,M,N
+        
         
         query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
         value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,N//self.heads,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
@@ -87,6 +93,7 @@ class SqueezeAttentionBlock(nn.Module):
         
         attention_result = attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
         
+        
         #Manual attention result because optimized kernels weren't optimized for this.
         
        #with sdpa_kernel(backends=[SDPBackend.MATH]):
@@ -96,9 +103,17 @@ class SqueezeAttentionBlock(nn.Module):
         
         attention_result = self.bn2((attention_result + func.relu(self.conv(attention_result))).view(B,M*N,H,W))
         
+        
         return attention_result.view(B,M,N,H,W)
 
-
+class UpProjection(nn.Module):
+    def __init__(self,n,n2):
+        super(UpProjection,self).__init__()
+        self.conv = nn.Conv2d(n, n2, 1, padding = "same")
+        self.n2 = n2
+    def forward(self,x):
+        B,M,N,H,W = x.shape
+        return self.conv(x.view(B*M,N,H,W)).view(B,M,self.n2,H,W)
 
         
         
@@ -110,23 +125,32 @@ class SqueezeAttention(nn.Module):
     
     def __init__(self,in_channels,classes):
         super(SqueezeAttention,self).__init__()
-        self.intro = nn.Conv2d(in_channels,512,kernel_size=7,padding="same")
-        self.SAB1 = SqueezeAttentionBlock(8, 64)
-        self.SAB2 = SqueezeAttentionBlock(8, 64)
-        #self.SAB3 = SqueezeAttentionBlock(8, 64)
+        self.intro = nn.Conv2d(in_channels,256,kernel_size=7,padding="same")
+        self.SAB1 = SqueezeAttentionBlock(8, 32)
+        self.SAB2 = SqueezeAttentionBlock(8, 32)
+        self.SAB3 = SqueezeAttentionBlock(8, 32)
         
         self.SAB4 = SqueezeAttentionBlock(8, 64)
         self.SAB5 = SqueezeAttentionBlock(8, 64)
         self.SAB6 = SqueezeAttentionBlock(8, 64)
-        self.SAB7 = SqueezeAttentionBlock(8, 64)
         
-        self.SAB8 = SqueezeAttentionBlock(8, 64)
+        self.SAB7 = SqueezeAttentionBlock(8, 128)
+        self.SAB8 = SqueezeAttentionBlock(8, 128)
+        self.SAB9 = SqueezeAttentionBlock(8, 128)
+        
+        self.SAB10 = SqueezeAttentionBlock(8, 256)
+        self.SAB11 = SqueezeAttentionBlock(8, 256)
+        self.SAB12 = SqueezeAttentionBlock(8, 256)
+        
+        self.UP1 = UpProjection(32, 64)
+        self.UP2 = UpProjection(64, 128)
+        self.UP3 = UpProjection(128, 256)
+        """
         self.SAB9 = SqueezeAttentionBlock(8, 64)
         self.SAB10 = SqueezeAttentionBlock(8, 64)
         self.SAB11 = SqueezeAttentionBlock(8, 64)
         self.SAB12 = SqueezeAttentionBlock(8, 64)
         self.SAB13 = SqueezeAttentionBlock(8, 64)
-        
         self.SAB14 = SqueezeAttentionBlock(8, 64)
         self.SAB15 = SqueezeAttentionBlock(8, 64)
         self.SAB16 = SqueezeAttentionBlock(8, 64)
@@ -135,40 +159,35 @@ class SqueezeAttention(nn.Module):
         self.SAB19 = SqueezeAttentionBlock(8, 64)
         self.SAB20 = SqueezeAttentionBlock(8, 64)
         self.SAB21 = SqueezeAttentionBlock(8, 64)
+        """
         
         self.dropout = nn.Dropout(0.5)
         
-        self.results = nn.Linear(512, classes)
+        self.results = nn.Linear(2048, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
-        x = self.intro(x).view(B,8,64,H,W)
+        x = self.intro(x).view(B,8,32,H,W)
         x = self.SAB1(x)
         x = self.SAB2(x)
-        #x = self.SAB3(x)
+        x = self.SAB3(x)
         x = self.squeeze_to_pool(x)
+        x = self.UP1(x)
         x = self.SAB4(x)
         x = self.SAB5(x)
         x = self.SAB6(x)
-        x = self.SAB7(x)
         x = self.squeeze_to_pool(x)
+        x = self.UP2(x)
+        x = self.SAB7(x)
         x = self.SAB8(x)
         x = self.SAB9(x)
+        x = self.squeeze_to_pool(x)
+        x = self.UP3(x)
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
-        x = self.SAB13(x)
-        x = self.squeeze_to_pool(x)
-        x = self.SAB14(x)
-        x = self.SAB15(x)
-        x = self.SAB16(x)
-        x = self.SAB17(x)
-        x = self.SAB18(x)
-        x = self.SAB19(x)
-        x = self.SAB20(x)
-        x = self.SAB21(x)
         
-        x = self.dropout(x.mean((3,4)).view(-1,512))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -226,9 +245,9 @@ for epoch in range(10):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention2_1.pt")
+        torch.save(net.state_dict(),"Breast_SqueezeAttention3_1.pt")
     
-pretrained = torch.load("Breast_SqueezeAttention2_1.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Breast_SqueezeAttention3_1.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
@@ -254,6 +273,12 @@ print("accuracy: ",correct / total)
 #Breast mnist: 0.7179
 #Smaller version: 0.7308
 # 90k parameters only! 
+#Change to (8,64)
+# about 1m parameters.
+#0.7692
 
+#Add up_projection. 
+#0.8333
+# 2m parameters.
 
 
