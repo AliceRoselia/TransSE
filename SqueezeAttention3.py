@@ -40,7 +40,7 @@ class residualBlock(nn.Module):
 #a flexible attention.
 
     
-batch_size = 8
+batch_size = 16
 
 
 train_data = BreastMNIST(split="train",transform = transforms.Compose([
@@ -63,7 +63,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 
 class SqueezeAttentionBlock(nn.Module):
     
-    def __init__(self,m,n, head = 8):
+    def __init__(self,m,n, head = 4):
         super(SqueezeAttentionBlock,self).__init__()
         assert n%head == 0
         self.channel_group_count = m
@@ -198,7 +198,7 @@ class SqueezeAttention(nn.Module):
 
 net = SqueezeAttention(1, 2).to("cuda")
 #net = torch.compile(net)
-optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
+optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4, betas=(0.8,0.99))
 loss = nn.CrossEntropyLoss()
 
 #pretrained = torch.load("SEnet.pt")
@@ -215,7 +215,7 @@ best = 0
 #pretrained = torch.load("Breast_SqueezeAttention4_1.pt")
 #net.load_state_dict(pretrained)
 
-for epoch in range(20):
+for epoch in range(5):
     
     current = 0
     
@@ -248,9 +248,9 @@ for epoch in range(20):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention7_1.pt")
+        torch.save(net.state_dict(),"Breast_SqueezeAttention8_1.pt")
     
-pretrained = torch.load("Breast_SqueezeAttention7_1.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Breast_SqueezeAttention8_1.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
@@ -303,3 +303,7 @@ print("accuracy: ",correct / total)
 #0.8205
 
 #8 heads.
+#0.7436 Horrible result.
+
+#Reverting again. Now, try betas = (0.8,0.96)
+#0.7692 Not working.
