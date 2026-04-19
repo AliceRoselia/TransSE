@@ -287,6 +287,7 @@ print("accuracy: ",correct / total)
 #0.8333
 #On the second thought... After some more training, the 3m params beat the 2m params version.
 #0.8590
+#This one is breast_squeezeattention_4_2
 
 #On the other hand, it is very compute-heavy. This one took 102.3(G) MACS compared to 4.14(G) in resnet50. 
 

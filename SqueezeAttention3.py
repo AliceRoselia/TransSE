@@ -63,7 +63,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 
 class SqueezeAttentionBlock(nn.Module):
     
-    def __init__(self,m,n, head = 4):
+    def __init__(self,m,n, head = 8):
         super(SqueezeAttentionBlock,self).__init__()
         assert n%head == 0
         self.channel_group_count = m
@@ -125,49 +125,49 @@ class SqueezeAttention(nn.Module):
     
     def __init__(self,in_channels,classes):
         super(SqueezeAttention,self).__init__()
-        self.intro = nn.Conv2d(in_channels,384,kernel_size=7,padding="same")
-        self.SAB1 = SqueezeAttentionBlock(12, 32)
-        self.SAB2 = SqueezeAttentionBlock(12, 32)
-        self.SAB3 = SqueezeAttentionBlock(12, 32)
+        self.intro = nn.Conv2d(in_channels,256,kernel_size=7,padding="same")
+        self.SAB1 = SqueezeAttentionBlock(8, 32)
+        self.SAB2 = SqueezeAttentionBlock(8, 32)
+        self.SAB3 = SqueezeAttentionBlock(8, 32)
         
-        self.SAB4 = SqueezeAttentionBlock(12, 64)
-        self.SAB5 = SqueezeAttentionBlock(12, 64)
-        self.SAB6 = SqueezeAttentionBlock(12, 64)
+        self.SAB4 = SqueezeAttentionBlock(8, 64)
+        self.SAB5 = SqueezeAttentionBlock(8, 64)
+        self.SAB6 = SqueezeAttentionBlock(8, 64)
         
-        self.SAB7 = SqueezeAttentionBlock(12, 128)
-        self.SAB8 = SqueezeAttentionBlock(12, 128)
-        self.SAB9 = SqueezeAttentionBlock(12, 128)
+        self.SAB7 = SqueezeAttentionBlock(8, 128)
+        self.SAB8 = SqueezeAttentionBlock(8, 128)
+        self.SAB9 = SqueezeAttentionBlock(8, 128)
         
-        self.SAB10 = SqueezeAttentionBlock(12, 256)
-        self.SAB11 = SqueezeAttentionBlock(12, 256)
-        self.SAB12 = SqueezeAttentionBlock(12, 256)
+        self.SAB10 = SqueezeAttentionBlock(8, 256)
+        self.SAB11 = SqueezeAttentionBlock(8, 256)
+        self.SAB12 = SqueezeAttentionBlock(8, 256)
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
         """
-        self.SAB9 = SqueezeAttentionBlock(12, 64)
-        self.SAB10 = SqueezeAttentionBlock(12, 64)
-        self.SAB11 = SqueezeAttentionBlock(12, 64)
-        self.SAB12 = SqueezeAttentionBlock(12, 64)
-        self.SAB13 = SqueezeAttentionBlock(12, 64)
-        self.SAB14 = SqueezeAttentionBlock(12, 64)
-        self.SAB15 = SqueezeAttentionBlock(12, 64)
-        self.SAB16 = SqueezeAttentionBlock(12, 64)
-        self.SAB17 = SqueezeAttentionBlock(12, 64)
-        self.SAB18 = SqueezeAttentionBlock(12, 64)
-        self.SAB19 = SqueezeAttentionBlock(12, 64)
-        self.SAB20 = SqueezeAttentionBlock(12, 64)
-        self.SAB21 = SqueezeAttentionBlock(12, 64)
+        self.SAB9 = SqueezeAttentionBlock(8, 64)
+        self.SAB10 = SqueezeAttentionBlock(8, 64)
+        self.SAB11 = SqueezeAttentionBlock(8, 64)
+        self.SAB12 = SqueezeAttentionBlock(8, 64)
+        self.SAB13 = SqueezeAttentionBlock(8, 64)
+        self.SAB14 = SqueezeAttentionBlock(8, 64)
+        self.SAB15 = SqueezeAttentionBlock(8, 64)
+        self.SAB16 = SqueezeAttentionBlock(8, 64)
+        self.SAB17 = SqueezeAttentionBlock(8, 64)
+        self.SAB18 = SqueezeAttentionBlock(8, 64)
+        self.SAB19 = SqueezeAttentionBlock(8, 64)
+        self.SAB20 = SqueezeAttentionBlock(8, 64)
+        self.SAB21 = SqueezeAttentionBlock(8, 64)
         """
         
         self.dropout = nn.Dropout(0.5)
         
-        self.results = nn.Linear(3072, classes)
+        self.results = nn.Linear(2048, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
-        x = self.intro(x).view(B,12,32,H,W)
+        x = self.intro(x).view(B,8,32,H,W)
         x = self.SAB1(x)
         x = self.SAB2(x)
         x = self.SAB3(x)
@@ -187,7 +187,7 @@ class SqueezeAttention(nn.Module):
         x = self.SAB11(x)
         x = self.SAB12(x)
         
-        x = self.dropout(x.mean((3,4)).view(-1,3072))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -297,4 +297,9 @@ print("accuracy: ",correct / total)
 #Reverting to the original idea. Now, try Retina mnist.
 
 #0.5300
+#This one is Retina_squeezeattention_1_1
 
+#Breast mnist with more params:
+#0.8205
+
+#8 heads.
