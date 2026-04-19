@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
@@ -40,10 +40,10 @@ class residualBlock(nn.Module):
 #a flexible attention.
 
     
-batch_size = 16
+batch_size = 8
 
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -52,10 +52,10 @@ train_data = RetinaMNIST(split="train",transform = transforms.Compose([
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
 
 
@@ -125,49 +125,49 @@ class SqueezeAttention(nn.Module):
     
     def __init__(self,in_channels,classes):
         super(SqueezeAttention,self).__init__()
-        self.intro = nn.Conv2d(in_channels,256,kernel_size=7,padding="same")
-        self.SAB1 = SqueezeAttentionBlock(8, 32)
-        self.SAB2 = SqueezeAttentionBlock(8, 32)
-        self.SAB3 = SqueezeAttentionBlock(8, 32)
+        self.intro = nn.Conv2d(in_channels,384,kernel_size=7,padding="same")
+        self.SAB1 = SqueezeAttentionBlock(12, 32)
+        self.SAB2 = SqueezeAttentionBlock(12, 32)
+        self.SAB3 = SqueezeAttentionBlock(12, 32)
         
-        self.SAB4 = SqueezeAttentionBlock(8, 64)
-        self.SAB5 = SqueezeAttentionBlock(8, 64)
-        self.SAB6 = SqueezeAttentionBlock(8, 64)
+        self.SAB4 = SqueezeAttentionBlock(12, 64)
+        self.SAB5 = SqueezeAttentionBlock(12, 64)
+        self.SAB6 = SqueezeAttentionBlock(12, 64)
         
-        self.SAB7 = SqueezeAttentionBlock(8, 128)
-        self.SAB8 = SqueezeAttentionBlock(8, 128)
-        self.SAB9 = SqueezeAttentionBlock(8, 128)
+        self.SAB7 = SqueezeAttentionBlock(12, 128)
+        self.SAB8 = SqueezeAttentionBlock(12, 128)
+        self.SAB9 = SqueezeAttentionBlock(12, 128)
         
-        self.SAB10 = SqueezeAttentionBlock(8, 256)
-        self.SAB11 = SqueezeAttentionBlock(8, 256)
-        self.SAB12 = SqueezeAttentionBlock(8, 256)
+        self.SAB10 = SqueezeAttentionBlock(12, 256)
+        self.SAB11 = SqueezeAttentionBlock(12, 256)
+        self.SAB12 = SqueezeAttentionBlock(12, 256)
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
         """
-        self.SAB9 = SqueezeAttentionBlock(8, 64)
-        self.SAB10 = SqueezeAttentionBlock(8, 64)
-        self.SAB11 = SqueezeAttentionBlock(8, 64)
-        self.SAB12 = SqueezeAttentionBlock(8, 64)
-        self.SAB13 = SqueezeAttentionBlock(8, 64)
-        self.SAB14 = SqueezeAttentionBlock(8, 64)
-        self.SAB15 = SqueezeAttentionBlock(8, 64)
-        self.SAB16 = SqueezeAttentionBlock(8, 64)
-        self.SAB17 = SqueezeAttentionBlock(8, 64)
-        self.SAB18 = SqueezeAttentionBlock(8, 64)
-        self.SAB19 = SqueezeAttentionBlock(8, 64)
-        self.SAB20 = SqueezeAttentionBlock(8, 64)
-        self.SAB21 = SqueezeAttentionBlock(8, 64)
+        self.SAB9 = SqueezeAttentionBlock(12, 64)
+        self.SAB10 = SqueezeAttentionBlock(12, 64)
+        self.SAB11 = SqueezeAttentionBlock(12, 64)
+        self.SAB12 = SqueezeAttentionBlock(12, 64)
+        self.SAB13 = SqueezeAttentionBlock(12, 64)
+        self.SAB14 = SqueezeAttentionBlock(12, 64)
+        self.SAB15 = SqueezeAttentionBlock(12, 64)
+        self.SAB16 = SqueezeAttentionBlock(12, 64)
+        self.SAB17 = SqueezeAttentionBlock(12, 64)
+        self.SAB18 = SqueezeAttentionBlock(12, 64)
+        self.SAB19 = SqueezeAttentionBlock(12, 64)
+        self.SAB20 = SqueezeAttentionBlock(12, 64)
+        self.SAB21 = SqueezeAttentionBlock(12, 64)
         """
         
         self.dropout = nn.Dropout(0.5)
         
-        self.results = nn.Linear(2048, classes)
+        self.results = nn.Linear(3072, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
-        x = self.intro(x).view(B,8,32,H,W)
+        x = self.intro(x).view(B,12,32,H,W)
         x = self.SAB1(x)
         x = self.SAB2(x)
         x = self.SAB3(x)
@@ -187,7 +187,7 @@ class SqueezeAttention(nn.Module):
         x = self.SAB11(x)
         x = self.SAB12(x)
         
-        x = self.dropout(x.mean((3,4)).view(-1,2048))
+        x = self.dropout(x.mean((3,4)).view(-1,3072))
         
         return self.results(x)
         
@@ -196,7 +196,7 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(3, 5).to("cuda")
+net = SqueezeAttention(1, 2).to("cuda")
 #net = torch.compile(net)
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
@@ -215,7 +215,7 @@ best = 0
 #pretrained = torch.load("Breast_SqueezeAttention4_1.pt")
 #net.load_state_dict(pretrained)
 
-for epoch in range(10):
+for epoch in range(20):
     
     current = 0
     
@@ -248,14 +248,14 @@ for epoch in range(10):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Retina_SqueezeAttention1_1.pt")
+        torch.save(net.state_dict(),"Breast_SqueezeAttention7_1.pt")
     
-pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Breast_SqueezeAttention7_1.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
 correct = 0
-total = 400 
+total = 156 
     
 with torch.no_grad():
     
@@ -295,4 +295,6 @@ print("accuracy: ",correct / total)
 #0.8077
 
 #Reverting to the original idea. Now, try Retina mnist.
+
+#0.5300
 
