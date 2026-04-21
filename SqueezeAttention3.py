@@ -15,7 +15,7 @@ import torch.utils.data as data
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(44542)
+torch.manual_seed(4154908)
 
 torch.set_float32_matmul_precision("high")
 
@@ -23,16 +23,6 @@ torch.set_float32_matmul_precision("high")
 #TransSEnet for medical imaging and similar tasks.
 
 
-
-class residualBlock(nn.Module):
-    
-    def __init__(self,submodule):
-        super(residualBlock,self).__init__()
-        self.submodule = submodule
-    
-    def forward(self,x):
-        #Simple residual block to be fixed later if we want a more complex one.
-        return x + self.submodule(x)
     
 
         
@@ -75,6 +65,10 @@ class SqueezeAttentionBlock(nn.Module):
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
     
+    @torch.compile()
+    def fused_conv_activation(self,x):
+        return x + func.gelu(self.conv(x))
+    
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
     
@@ -91,7 +85,7 @@ class SqueezeAttentionBlock(nn.Module):
         
         attn = func.softmax(scores,dim=-1)
         
-        attention_result = attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
+        attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
         
         
         #Manual attention result because optimized kernels weren't optimized for this.
@@ -101,7 +95,7 @@ class SqueezeAttentionBlock(nn.Module):
         attention_result = attention_result.reshape(B,M,N,H,W) + x
         attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
         
-        attention_result = self.bn2((attention_result + func.relu(self.conv(attention_result))).view(B,M*N,H,W))
+        attention_result = self.bn2(self.fused_conv_activation(attention_result).view(B,M*N,H,W))
         
         
         return attention_result.view(B,M,N,H,W)
@@ -121,6 +115,7 @@ class SqueezeAttention(nn.Module):
     def squeeze_to_pool(self,x):
         B,M,N,H,W = x.shape
         return func.max_pool2d(x.view(B*M,N,H,W), 2).view(B,M,N,H//2,W//2)
+    #USE max pooling. Strided convolution was tried and did NOT help.
 
     
     def __init__(self,in_channels,classes):
@@ -197,8 +192,8 @@ class SqueezeAttention(nn.Module):
 
 
 net = SqueezeAttention(1, 2).to("cuda")
-#net = torch.compile(net)
-optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4, betas=(0.8,0.99))
+#net = torch.compile(net,mode = "reduce-overhead") #Counterproductive. Only compile the bottleneck.
+optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
 
 #pretrained = torch.load("SEnet.pt")
@@ -212,12 +207,13 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-#pretrained = torch.load("Breast_SqueezeAttention4_1.pt")
+#pretrained = torch.load("Breast_SqueezeAttention11_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-for epoch in range(5):
+for epoch in range(60):
     
     current = 0
+    net.train()
     
     for data_input, result in train_data_loader:
     
@@ -235,6 +231,7 @@ for epoch in range(5):
         
         print(result_loss)
     
+    net.eval()
     correct = 0
     with torch.no_grad():
         for data_input, result in val_data_loader:
@@ -248,15 +245,16 @@ for epoch in range(5):
     if correct > best:
         best = correct
         print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention8_1.pt")
+        torch.save(net.state_dict(),"Breast_SqueezeAttention12_1.pt")
     
-pretrained = torch.load("Breast_SqueezeAttention8_1.pt") #Let's get up to 10 epochs?
+pretrained = torch.load("Breast_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
 net.load_state_dict(pretrained)
 
 
 correct = 0
 total = 156 
     
+net.eval()
 with torch.no_grad():
     
     for data_input, result in test_data_loader:
@@ -307,3 +305,27 @@ print("accuracy: ",correct / total)
 
 #Reverting again. Now, try betas = (0.8,0.96)
 #0.7692 Not working.
+
+#The previous evaluations were noisy because I forgot to set the net in eval mode.
+
+#The best model so far got this. 
+#0.8654 (Breast_SqueezeAttention4_2)
+
+#With the adjusted betas... 0.7756 Not working.
+
+#Try the version with the correct evaluation (20 epochs): 0.8526
+#(Breast_SqueezeAttention10_1)
+
+#Try a second round to push the number higher. (Not trained to completion.)
+
+# 0.8718
+#Retina mnist:
+#0.5375
+#Retina_SqueezeAttention2_1
+
+#Now, version 3. Let's change to Gelu.
+#0.5700
+
+#Let's try breastMNIST with it.
+#0.8205 (Not so good yet.)
+#Final result: 0.8526
