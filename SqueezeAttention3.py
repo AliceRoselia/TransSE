@@ -31,7 +31,8 @@ torch.set_float32_matmul_precision("high")
 
     
 batch_size = 16
-
+num_workers = 4
+prefetch_factor = 8 
 
 train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
@@ -40,13 +41,16 @@ train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
-train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True)
+train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
+pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
-val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True)
+val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
+pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
-test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False)
+test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
+pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 
 #Use torch.nn.functional.scaled_dot_product_attention
@@ -64,14 +68,19 @@ class SqueezeAttentionBlock(nn.Module):
         self.conv = nn.Conv2d(n, n, 3, padding = "same")
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
+        self.head_size = n//head
+        scale = torch.full((head,m,m),self.head_size ** -0.5)
+        self.register_buffer("scale", scale) #Pre-broadcast
     
-    @torch.compile()
+    #@torch.compile()
     def fused_conv_activation(self,x):
         return x + func.gelu(self.conv(x))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
     
+    
+    @torch.compile()
     def forward(self,x):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
@@ -79,13 +88,18 @@ class SqueezeAttentionBlock(nn.Module):
         
         
         query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
-        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,N//self.heads,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
-        scale = (N//self.heads) ** -0.5
-        scores = torch.matmul(query, key.transpose(-2, -1)) * scale #Dimensions B, Head, M, M
+        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
+        
+        scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
         
         attn = func.softmax(scores,dim=-1)
         
         attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
+        #print(self.scale.device)
+        
+        
+        #attention_result = self.attention_kernel(query,key,value,self.scale)
+    
         
         
         #Manual attention result because optimized kernels weren't optimized for this.
@@ -104,14 +118,16 @@ class UpProjection(nn.Module):
     def __init__(self,n,n2):
         super(UpProjection,self).__init__()
         self.conv = nn.Conv2d(n, n2, 1, padding = "same")
-        self.n2 = n2
+        assert n2 == 2*n
+    #@torch.compile()
     def forward(self,x):
         B,M,N,H,W = x.shape
-        return self.conv(x.view(B*M,N,H,W)).view(B,M,self.n2,H,W)
+        return self.conv(x.view(B*M,N,H,W)).view(B,M,N*2,H,W)
 
         
         
 class SqueezeAttention(nn.Module):
+    #@torch.compile()
     def squeeze_to_pool(self,x):
         B,M,N,H,W = x.shape
         return func.max_pool2d(x.view(B*M,N,H,W), 2).view(B,M,N,H//2,W//2)
@@ -192,7 +208,7 @@ class SqueezeAttention(nn.Module):
 
 
 net = SqueezeAttention(1, 2).to("cuda")
-#net = torch.compile(net,mode = "reduce-overhead") #Counterproductive. Only compile the bottleneck.
+#net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
 
@@ -210,59 +226,59 @@ best = 0
 #pretrained = torch.load("Breast_SqueezeAttention11_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-for epoch in range(60):
+if __name__ == "__main__":
+    for epoch in range(60):
+        print("Current epoch:",epoch+1)
     
-    current = 0
-    net.train()
-    
-    for data_input, result in train_data_loader:
-    
-        print(current)
-        current += batch_size
-        result = result.to("cuda")
-        prediction = net(data_input.to("cuda"))
-        result_loss = loss(prediction,result.view(-1))
-        result_loss.backward()
+        net.train()
+        batch = 0
+        for data_input, result in train_data_loader:
+            batch += 1
+            print("batch:",batch)
+            result = result.to("cuda",non_blocking = True)
+            prediction = net(data_input.to("cuda",non_blocking = True))
+            result_loss = loss(prediction,result.view(-1))
+            result_loss.backward()
+            
+            optimizer.step()
+            optimizer.zero_grad()
+            
+            
+            
+            #print(result_loss)
         
-        optimizer.step()
-        optimizer.zero_grad()
+        net.eval()
+        correct = 0
+        with torch.no_grad():
+            for data_input, result in val_data_loader:
+                result = result.to("cuda",non_blocking = True)
+                prediction = net(data_input.to("cuda",non_blocking = True))
+                correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
         
+        print("correct:",correct)
+        #Out of 120 for retina.
+        #78 for breast.
+        if correct > best:
+            best = correct
+            print("New frontier reached.")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention12_1.pt")
         
-        
-        print(result_loss)
-    
-    net.eval()
+    pretrained = torch.load("Breast_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
+    net.load_state_dict(pretrained)
+
+
     correct = 0
+    total = 156 
+        
+    net.eval()
     with torch.no_grad():
-        for data_input, result in val_data_loader:
-            result = result.to("cuda")
-            prediction = net(data_input.to("cuda"))
-            correct += (prediction.argmax(dim=1) == result.view(-1)).sum()
+        
+        for data_input, result in test_data_loader:
+            result = result.to("cuda",non_blocking = True)
+            prediction = net(data_input.to("cuda",non_blocking = True))
+            correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
     
-    print("correct:",correct)
-    #Out of 120 for retina.
-    #78 for breast.
-    if correct > best:
-        best = correct
-        print("New frontier reached.")
-        torch.save(net.state_dict(),"Breast_SqueezeAttention12_1.pt")
-    
-pretrained = torch.load("Breast_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
-net.load_state_dict(pretrained)
-
-
-correct = 0
-total = 156 
-    
-net.eval()
-with torch.no_grad():
-    
-    for data_input, result in test_data_loader:
-        result = result.to("cuda")
-        prediction = net(data_input.to("cuda"))
-        correct += (prediction.argmax(dim=1) == result.view(-1)).sum()
-
-print("accuracy: ",correct / total)
+    print("accuracy: ",correct / total)
 
 #torch.save(net.state_dict(),"SEnet_breast.pt")
 
