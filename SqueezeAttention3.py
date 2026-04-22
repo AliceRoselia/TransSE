@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import BreastMNIST
+from medmnist import RetinaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 
@@ -34,7 +34,7 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = BreastMNIST(split="train",transform = transforms.Compose([
+train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -44,11 +44,11 @@ train_data = BreastMNIST(split="train",transform = transforms.Compose([
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -74,7 +74,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.gelu(self.conv(x))
+        return x + func.silu(self.conv(x))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
@@ -207,7 +207,7 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(1, 2).to("cuda")
+net = SqueezeAttention(3, 5).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
 loss = nn.CrossEntropyLoss()
@@ -227,7 +227,7 @@ best = 0
 #net.load_state_dict(pretrained)
 
 if __name__ == "__main__":
-    for epoch in range(60):
+    for epoch in range(50):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -261,14 +261,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention12_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention4_1.pt")
         
-    pretrained = torch.load("Breast_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
+        
+
+#This section is deliberately separate in case we want to just evaluate the model.
+
+if __name__ == "__main__":
+    pretrained = torch.load("Retina_SqueezeAttention4_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 156 
+    total = 400 
         
     net.eval()
     with torch.no_grad():
@@ -345,3 +350,10 @@ if __name__ == "__main__":
 #Let's try breastMNIST with it.
 #0.8205 (Not so good yet.)
 #Final result: 0.8526
+
+#Version 12. Let's see if it was a fluke.
+#0.8205
+#With actual training, silu: 
+#0.8718
+#Retina mnist:
+#0.565
