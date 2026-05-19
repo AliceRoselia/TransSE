@@ -12,6 +12,9 @@ import torch.nn.functional as func
 from medmnist import RetinaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
+from muon import SingleDeviceMuonWithAuxAdam
+#We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
+
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -30,7 +33,7 @@ torch.set_float32_matmul_precision("high")
 #a flexible attention.
 
     
-batch_size = 12
+batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
@@ -64,8 +67,6 @@ class SqueezeAttentionBlock(nn.Module):
         self.qk = nn.Linear(n,2*n)
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
-        self.local_value_conv = nn.Conv2d(n, n, 1)
-        self.channel_beta_params = nn.Linear(n, n)
         self.bn1 = nn.BatchNorm2d(m*n)
         self.conv = nn.Conv2d(n, n, 3, padding = "same")
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
@@ -73,8 +74,6 @@ class SqueezeAttentionBlock(nn.Module):
         self.head_size = n//head
         scale = torch.full((head,m,m),self.head_size ** -0.5)
         self.register_buffer("scale", scale) #Pre-broadcast
-    
-    
     
     #@torch.compile()
     def fused_conv_activation(self,x):
@@ -90,38 +89,27 @@ class SqueezeAttentionBlock(nn.Module):
         B,M,N,H,W = x.shape
         channel_reps = x.mean((3,4)) #dimension: B,M,N
         
-        viewed_x = x.view(B*M,N,H,W)
-        
-        channel_beta = 2*func.sigmoid(self.channel_beta_params(channel_reps.view(B*M,N))).unsqueeze(-1).unsqueeze(-1)
-        
         
         query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
-        value = self.value_conv(viewed_x).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
+        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
         
         scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
         
         attn = func.softmax(scores,dim=-1)
         
-        #We avoid scaled_dot_product_attention because it was not optimized for such a case.
         attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
-        
-        #attention_result = attention_result.reshape(B,M,N,H,W) + x #To be replaced.
-        attention_result = func.normalize(attention_result.reshape(B*M,N,H,W),dim=1)
-        
-        projection = torch.einsum("baij,baij -> bij",attention_result,viewed_x).unsqueeze(1)
-        
-        # dimension: B*M,1,H,W
-        
-        local_value = self.value_conv(viewed_x)
-        
-        projected_value = projection-local_value
+        #print(self.scale.device)
         
         
-        attention_result =viewed_x + channel_beta*attention_result*projected_value
+        #attention_result = self.attention_kernel(query,key,value,self.scale)
+    
         
         
+        #Manual attention result because optimized kernels weren't optimized for this.
         
-        
+       #with sdpa_kernel(backends=[SDPBackend.MATH]):
+            #attention_result = func.scaled_dot_product_attention(query,key,value).view(B,M,N,H,W)
+        attention_result = attention_result.reshape(B,M,N,H,W) + x
         attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
         
         attention_result = self.bn2(self.fused_conv_activation(attention_result).view(B,M*N,H,W))
@@ -224,7 +212,21 @@ class SqueezeAttention(nn.Module):
 
 net = SqueezeAttention(3, 5).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
-optimizer = torch.optim.Adam(net.parameters(),lr = 1.5e-4)
+
+#Muon with new adjustment algorithm. No weight decay because only 3m parameters.
+
+hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
+hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
+nonhidden_params = [net.results.weight]
+param_groups = [
+    dict(params=hidden_weights, use_muon=True,
+         lr=0.01, weight_decay=0.00),
+    dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.00),
+]
+optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+
+#optimizer = torch.optim.Muon(net.parameters(),weight_decay = 0.0,lr = 1.5e-4,adjust_lr_fn = "match_rms_adamw")
 loss = nn.CrossEntropyLoss()
 
 #pretrained = torch.load("SEnet.pt")
@@ -238,12 +240,11 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-pretrained = torch.load("Retina_SqueezeAttention5_2.pt") #Let's get up to 10 epochs?
-net.load_state_dict(pretrained)
-
+#pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
+#net.load_state_dict(pretrained)
 
 if __name__ == "__main__":
-    for epoch in range(10):
+    for epoch in range(20):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -277,14 +278,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention5_3.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention6_1.pt")
         
-
+        
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention5_3.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -372,8 +373,7 @@ if __name__ == "__main__":
 #With actual training, silu: 
 #0.8718
 #Retina mnist:
-#0.565
+#0.565'
 
-#With deep delta learning: 0.5225
-#Try training again: 0.535
-#Trying again: 0.5075
+#With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
+#0.6175. SOTA!
