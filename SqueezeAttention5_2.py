@@ -379,3 +379,4 @@ if __name__ == "__main__":
 #0.6175. SOTA!
 #Breast mnist: 0.8397435897435898
 # With 5 epochs: 0.595
+# With another 5 epochs: 0.6075
