@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from muon import SingleDeviceMuonWithAuxAdam
@@ -37,7 +37,7 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -47,11 +47,11 @@ train_data = RetinaMNIST(split="train",transform = transforms.Compose([
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -210,7 +210,7 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(3, 5).to("cuda")
+net = SqueezeAttention(1, 2).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
@@ -244,7 +244,7 @@ best = 0
 #net.load_state_dict(pretrained)
 
 if __name__ == "__main__":
-    for epoch in range(5):
+    for epoch in range(20):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -278,19 +278,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention6_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention6_1.pt")
         
         
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 400 
+    total = 156 
         
     net.eval()
     with torch.no_grad():
@@ -377,3 +377,4 @@ if __name__ == "__main__":
 
 #With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
 #0.6175. SOTA!
+#Breast mnist: 0.8397435897435898
