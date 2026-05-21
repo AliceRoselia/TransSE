@@ -377,3 +377,4 @@ if __name__ == "__main__":
 
 #With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
 #0.6175. SOTA!
+# With 5 epochs: 0.595

@@ -278,14 +278,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention6_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention14_1.pt")
         
         
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention14_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -378,3 +378,4 @@ if __name__ == "__main__":
 #With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
 #0.6175. SOTA!
 #Breast mnist: 0.8397435897435898
+# With 5 epochs: 0.595
