@@ -380,3 +380,4 @@ if __name__ == "__main__":
 #Breast mnist: 0.8397435897435898
 # With 5 epochs: 0.595
 # With another 5 epochs: 0.6075
+# 10 epochs 

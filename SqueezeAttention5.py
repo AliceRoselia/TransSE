@@ -18,7 +18,7 @@ from muon import SingleDeviceMuonWithAuxAdam
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(4154908)
+torch.manual_seed(958761)
 
 torch.set_float32_matmul_precision("high")
 
@@ -240,11 +240,12 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
-net.load_state_dict(pretrained)
+#pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
+#net.load_state_dict(pretrained)
+
 
 if __name__ == "__main__":
-    for epoch in range(5):
+    for epoch in range(10):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -278,14 +279,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention6_2.pt")
-        
+            torch.save(net.state_dict(),"Retina_SqueezeAttention7_1.pt")
+
         
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention6_2.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention7_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -376,6 +377,8 @@ if __name__ == "__main__":
 #0.565'
 
 #With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
-#0.6175. SOTA!
+# 0.6175. SOTA!
 # With 5 epochs: 0.595
 # With another 5 epochs: 0.6075
+# Trying 10 epochs with a different seed: 
+# 0.625 (Yay!)
