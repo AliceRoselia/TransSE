@@ -41,7 +41,7 @@ train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
+    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue = 0.15),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
@@ -159,21 +159,6 @@ class SqueezeAttention(nn.Module):
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        """
-        self.SAB9 = SqueezeAttentionBlock(8, 64)
-        self.SAB10 = SqueezeAttentionBlock(8, 64)
-        self.SAB11 = SqueezeAttentionBlock(8, 64)
-        self.SAB12 = SqueezeAttentionBlock(8, 64)
-        self.SAB13 = SqueezeAttentionBlock(8, 64)
-        self.SAB14 = SqueezeAttentionBlock(8, 64)
-        self.SAB15 = SqueezeAttentionBlock(8, 64)
-        self.SAB16 = SqueezeAttentionBlock(8, 64)
-        self.SAB17 = SqueezeAttentionBlock(8, 64)
-        self.SAB18 = SqueezeAttentionBlock(8, 64)
-        self.SAB19 = SqueezeAttentionBlock(8, 64)
-        self.SAB20 = SqueezeAttentionBlock(8, 64)
-        self.SAB21 = SqueezeAttentionBlock(8, 64)
-        """
         
         self.dropout = nn.Dropout(0.25)
         
