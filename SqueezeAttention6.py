@@ -393,7 +393,7 @@ if __name__ == "__main__":
 
 #Delete squeezeattention_9_1 and try 0.15 color jitter.
 
-#0.6425! Yay! *(Squeezeattention9_1)
+#0.6425! Yay! *(Squeezeattention9_1) Also checkpoint 5
 
 #With head = 8: 0.6175 (v10)
 
