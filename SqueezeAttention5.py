@@ -398,3 +398,6 @@ if __name__ == "__main__":
 #With head = 8: 0.6175 (v10)
 
 #Now, update to v11 and try head=8 for the last 2 resolutions only: 0.5825
+
+#Try another seed with 20 epochs: 0.5975
+#So, if not that lucky, could be worse.
