@@ -18,7 +18,7 @@ from muon import SingleDeviceMuonWithAuxAdam
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(958761)
+torch.manual_seed(412857)
 
 torch.set_float32_matmul_precision("high")
 
@@ -41,7 +41,7 @@ train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue = 0.15),
+    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
@@ -230,7 +230,7 @@ best = 0
 
 
 if __name__ == "__main__":
-    for epoch in range(10):
+    for epoch in range(20):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -264,14 +264,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention12_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention13_1.pt")
 
         
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention13_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -383,3 +383,5 @@ if __name__ == "__main__":
 #With head = 8: 0.6175 (v10)
 
 #Now, update to v11 and try head=8 for the last 2 resolutions only: 0.5825
+
+#With hue jitter: only 0.43
