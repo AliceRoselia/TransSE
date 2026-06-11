@@ -12,11 +12,7 @@ import torch.nn.functional as func
 from medmnist import RetinaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
-from muon import SingleDeviceMuonWithAuxAdam
-#We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
-torch._dynamo.config.recompile_limit = 128
-torch._dynamo.config.cache_size_limit = 128 
-torch._dynamo.config.accumulated_cache_size_limit = 128
+
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -39,21 +35,10 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
-    # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
-]),download=True,size = 224)
-train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
-val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+#We will test on the train data.
+test_data = RetinaMNIST(split="train",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -158,19 +143,13 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
-        self.SAB13 = SqueezeAttentionBlock(8, 512)
-        self.SAB14 = SqueezeAttentionBlock(8, 512)
-        self.SAB15 = SqueezeAttentionBlock(8, 512)
-        
-        
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP4 = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(4096, classes)
+        self.results = nn.Linear(2048, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
@@ -178,30 +157,23 @@ class SqueezeAttention(nn.Module):
         x = self.SAB1(x)
         x = self.SAB2(x)
         x = self.SAB3(x)
-        x = self.squeeze_to_pool(x) #112
+        x = self.squeeze_to_pool(x)
         x = self.UP1(x)
         x = self.SAB4(x)
         x = self.SAB5(x)
         x = self.SAB6(x)
-        x = self.squeeze_to_pool(x) #56
+        x = self.squeeze_to_pool(x)
         x = self.UP2(x)
         x = self.SAB7(x)
         x = self.SAB8(x)
         x = self.SAB9(x)
-        x = self.squeeze_to_pool(x) #28
+        x = self.squeeze_to_pool(x)
         x = self.UP3(x)
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
-        x = self.squeeze_to_pool(x) #14
-        x = self.UP4(x)
-        x = self.SAB13(x)
-        x = self.SAB14(x)
-        x = self.SAB15(x)
         
-        
-        
-        x = self.dropout(x.mean((3,4)).view(-1,4096))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -213,85 +185,19 @@ class SqueezeAttention(nn.Module):
 net = SqueezeAttention(3, 5).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
-#Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
-hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.results.weight]
-param_groups = [
-    dict(params=hidden_weights, use_muon=True,
-         lr=0.01, weight_decay=0.00),
-    dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.00),
-]
-optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
-#optimizer = torch.optim.Muon(net.parameters(),weight_decay = 0.0,lr = 1.5e-4,adjust_lr_fn = "match_rms_adamw")
-loss = nn.CrossEntropyLoss()
 
-#pretrained = torch.load("SEnet.pt")
 
-#del pretrained["layers.0.weight"]
-#del pretrained["layers.0.bias"]
-#del pretrained["results.weight"]
-#del pretrained["results.bias"]
-
-#net.load_state_dict(pretrained,strict=False)
-
-best = 0
-
-#pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
-#net.load_state_dict(pretrained)
 
 
 if __name__ == "__main__":
-    for epoch in range(10):
-        print("Current epoch:",epoch+1)
-    
-        net.train()
-        batch = 0
-        for data_input, result in train_data_loader:
-            batch += 1
-            print("batch:",batch)
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            result_loss = loss(prediction,result.view(-1))
-            result_loss.backward()
-            
-            optimizer.step()
-            optimizer.zero_grad()
-            
-            
-            
-            #print(result_loss)
-        
-        net.eval()
-        correct = 0
-        with torch.no_grad():
-            for data_input, result in val_data_loader:
-                result = result.to("cuda",non_blocking = True)
-                prediction = net(data_input.to("cuda",non_blocking = True))
-                correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
-        
-        print("correct:",correct)
-        #Out of 120 for retina.
-        #78 for breast.
-        if correct > best:
-            best = correct
-            print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention15_1.pt")
-
-        
-
-#This section is deliberately separate in case we want to just evaluate the model.
-
-if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention15_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention9_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 400 
+    total = 1080 
         
     net.eval()
     with torch.no_grad():
@@ -405,4 +311,10 @@ if __name__ == "__main__":
 #With another seed, 25 epochs: 
 # 0.615
 
-#Version 15: More layers!
+#Breast mnist: 0.814
+
+#Accuracy for training: 0.8571
+
+#Accuracy for training retina: 0.712
+
+#Accuracy for training retina on the better one: 0.675

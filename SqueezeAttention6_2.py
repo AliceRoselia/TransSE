@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from muon import SingleDeviceMuonWithAuxAdam
@@ -39,21 +39,21 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
+    transforms.RandomRotation(30),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -210,7 +210,7 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(3, 5).to("cuda")
+net = SqueezeAttention(1, 2).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
@@ -243,9 +243,10 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
+"""
 
 if __name__ == "__main__":
-    for epoch in range(10):
+    for epoch in range(25):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -279,19 +280,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention15_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention20_1.pt")
 
-        
+"""
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention15_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention18_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 400 
+    total = 156 
         
     net.eval()
     with torch.no_grad():
@@ -405,4 +406,17 @@ if __name__ == "__main__":
 #With another seed, 25 epochs: 
 # 0.615
 
-#Version 15: More layers!
+#Breast mnist: 0.814
+
+#With jitter = 0.3: 0.8526
+
+#With rotation = 30: 0.859
+
+#With more layers: 0.8718 (version 18.)
+
+#Version 19 got only like 0.78. Maybe the training got interrupted. Trying again.
+
+#Real version 19: 
+# 0.859
+
+#With even more layer (version 20): 0.782
