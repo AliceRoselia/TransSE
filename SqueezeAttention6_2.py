@@ -425,3 +425,5 @@ if __name__ == "__main__":
 
 #Version 23: With adam for the first layer.
 #0.8077
+
+#Version 24: good validation, but only 0.8462 test.
