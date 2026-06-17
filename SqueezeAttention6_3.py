@@ -12,7 +12,8 @@ import torch.nn.functional as func
 from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
-from muon import SingleDeviceMuonWithAuxAdam
+from torch.optim import Adam
+#from muon import SingleDeviceMuonWithAuxAdam
 #We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
 torch._dynamo.config.recompile_limit = 128
 torch._dynamo.config.cache_size_limit = 128 
@@ -161,7 +162,6 @@ class SqueezeAttention(nn.Module):
         self.SAB13 = SqueezeAttentionBlock(8, 512)
         self.SAB14 = SqueezeAttentionBlock(8, 512)
         self.SAB15 = SqueezeAttentionBlock(8, 512)
-        self.SAB16 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
@@ -199,7 +199,6 @@ class SqueezeAttention(nn.Module):
         x = self.SAB13(x)
         x = self.SAB14(x)
         x = self.SAB15(x)
-        x = self.SAB16(x)
         
         
         
@@ -217,16 +216,20 @@ net = SqueezeAttention(1, 2).to("cuda")
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
+"""
+hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.intro.weight, net.results.weight]
+nonhidden_params = [net.results.weight]
+
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.00),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
          lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.00),
 ]
-optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+"""
+
+optimizer = Adam(net.parameters(),lr=1.5e-4)
 
 #optimizer = torch.optim.Muon(net.parameters(),weight_decay = 0.0,lr = 1.5e-4,adjust_lr_fn = "match_rms_adamw")
 loss = nn.CrossEntropyLoss()
@@ -282,14 +285,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention24_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention22_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention24_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention22_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -423,5 +426,6 @@ if __name__ == "__main__":
 
 #With even more layer (version 20): 0.782
 
-#Version 23: With adam for the first layer.
-#0.8077
+#With adam: 0.8269
+
+#With adam: higher lr: 0.79

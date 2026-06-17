@@ -158,19 +158,14 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
-        self.SAB13 = SqueezeAttentionBlock(8, 512)
-        self.SAB14 = SqueezeAttentionBlock(8, 512)
-        self.SAB15 = SqueezeAttentionBlock(8, 512)
-        
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP4 = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(4096, classes)
+        self.results = nn.Linear(2048, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
@@ -193,15 +188,10 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
-        x = self.squeeze_to_pool(x) #14
-        x = self.UP4(x)
-        x = self.SAB13(x)
-        x = self.SAB14(x)
-        x = self.SAB15(x)
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,4096))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -279,14 +269,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention15_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention16_1.pt")
 
         
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention15_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention16_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -406,3 +396,4 @@ if __name__ == "__main__":
 # 0.615
 
 #Version 15: More layers!
+# 0.6075
