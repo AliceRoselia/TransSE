@@ -12,8 +12,7 @@ import torch.nn.functional as func
 from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
-from torch.optim import Adam
-#from muon import SingleDeviceMuonWithAuxAdam
+from muon import SingleDeviceMuonWithAuxAdam
 #We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
 torch._dynamo.config.recompile_limit = 128
 torch._dynamo.config.cache_size_limit = 128 
@@ -21,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(45968741)
+torch.manual_seed(45768742)
 
 torch.set_float32_matmul_precision("high")
 
@@ -43,8 +42,8 @@ prefetch_factor = 8
 train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(30),
-    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
+    transforms.RandomRotation(15),
+    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
@@ -162,6 +161,9 @@ class SqueezeAttention(nn.Module):
         self.SAB13 = SqueezeAttentionBlock(8, 512)
         self.SAB14 = SqueezeAttentionBlock(8, 512)
         self.SAB15 = SqueezeAttentionBlock(8, 512)
+        self.SAB16 = SqueezeAttentionBlock(8, 512)
+        #self.SAB17 = SqueezeAttentionBlock(8, 512)
+        #self.SAB18 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
@@ -199,6 +201,9 @@ class SqueezeAttention(nn.Module):
         x = self.SAB13(x)
         x = self.SAB14(x)
         x = self.SAB15(x)
+        x = self.SAB16(x)
+        #x = self.SAB17(x)
+        #x = self.SAB18(x)
         
         
         
@@ -216,20 +221,16 @@ net = SqueezeAttention(1, 2).to("cuda")
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
-"""
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
+hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.results.weight]
-
+nonhidden_params = [net.intro.weight, net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.00),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
          lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.00),
 ]
-"""
-
-optimizer = Adam(net.parameters(),lr=1.5e-4)
+optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
 #optimizer = torch.optim.Muon(net.parameters(),weight_decay = 0.0,lr = 1.5e-4,adjust_lr_fn = "match_rms_adamw")
 loss = nn.CrossEntropyLoss()
@@ -251,7 +252,7 @@ best = 0
 
 
 if __name__ == "__main__":
-    for epoch in range(25):
+    for epoch in range(10):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -285,14 +286,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention22_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention30_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention22_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention30_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -426,6 +427,19 @@ if __name__ == "__main__":
 
 #With even more layer (version 20): 0.782
 
-#With adam: 0.8269
+#Version 23: With adam for the first layer.
+#0.8077
 
-#With adam: higher lr: 0.79
+#Version 24: good validation, but only 0.8462 test.
+
+#Trying again, 30 epochs. 0.827
+
+#With dropout = 0.5 (4 blocks at the end): 0.878 (version 26)
+
+#With dropout = 0.5, 10 epochs, 3 blocks at the end: 0.82
+
+#With dropout = 0.5, 30 epochs, 6 blocks at the end: 0.859
+
+#With label smoothing: (from version 26): 0.8654 (This is version 29.)
+
+#Label smoothing = 0.05: 0.8654

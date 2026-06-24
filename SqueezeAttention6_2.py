@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(45968741)
+torch.manual_seed(45768742)
 
 torch.set_float32_matmul_precision("high")
 
@@ -162,6 +162,8 @@ class SqueezeAttention(nn.Module):
         self.SAB14 = SqueezeAttentionBlock(8, 512)
         self.SAB15 = SqueezeAttentionBlock(8, 512)
         self.SAB16 = SqueezeAttentionBlock(8, 512)
+        #self.SAB17 = SqueezeAttentionBlock(8, 512)
+        #self.SAB18 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
@@ -169,7 +171,7 @@ class SqueezeAttention(nn.Module):
         self.UP3 = UpProjection(128, 256)
         self.UP4 = UpProjection(256, 512)
         
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(0.5)
         
         self.results = nn.Linear(4096, classes)
     
@@ -200,6 +202,8 @@ class SqueezeAttention(nn.Module):
         x = self.SAB14(x)
         x = self.SAB15(x)
         x = self.SAB16(x)
+        #x = self.SAB17(x)
+        #x = self.SAB18(x)
         
         
         
@@ -248,7 +252,7 @@ best = 0
 
 
 if __name__ == "__main__":
-    for epoch in range(25):
+    for epoch in range(30):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -282,14 +286,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention24_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention30_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention24_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention30_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -427,3 +431,15 @@ if __name__ == "__main__":
 #0.8077
 
 #Version 24: good validation, but only 0.8462 test.
+
+#Trying again, 30 epochs. 0.827
+
+#With dropout = 0.5 (4 blocks at the end): 0.878 (version 26)
+
+#With dropout = 0.5, 10 epochs, 3 blocks at the end: 0.82
+
+#With dropout = 0.5, 30 epochs, 6 blocks at the end: 0.859
+
+#With label smoothing: (from version 26): 0.8654 (This is version 29.)
+
+#Label smoothing = 0.05: 0.8654
