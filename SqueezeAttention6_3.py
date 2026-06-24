@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import BreastMNIST
+from medmnist import PneumoniaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from muon import SingleDeviceMuonWithAuxAdam
@@ -39,7 +39,7 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = BreastMNIST(split="train",transform = transforms.Compose([
+train_data = PneumoniaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -49,11 +49,11 @@ train_data = BreastMNIST(split="train",transform = transforms.Compose([
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = PneumoniaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = PneumoniaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -158,22 +158,15 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
-        self.SAB13 = SqueezeAttentionBlock(8, 512)
-        self.SAB14 = SqueezeAttentionBlock(8, 512)
-        self.SAB15 = SqueezeAttentionBlock(8, 512)
-        self.SAB16 = SqueezeAttentionBlock(8, 512)
-        #self.SAB17 = SqueezeAttentionBlock(8, 512)
-        #self.SAB18 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP4 = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(4096, classes)
+        self.results = nn.Linear(2048, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
@@ -197,17 +190,10 @@ class SqueezeAttention(nn.Module):
         x = self.SAB11(x)
         x = self.SAB12(x)
         x = self.squeeze_to_pool(x) #14
-        x = self.UP4(x)
-        x = self.SAB13(x)
-        x = self.SAB14(x)
-        x = self.SAB15(x)
-        x = self.SAB16(x)
-        #x = self.SAB17(x)
-        #x = self.SAB18(x)
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,4096))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -286,19 +272,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention30_1.pt")
+            torch.save(net.state_dict(),"Pneumonia_SqueezeAttention1_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention30_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Pneumonia_SqueezeAttention1_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 156 
+    total = 624 
         
     net.eval()
     with torch.no_grad():
