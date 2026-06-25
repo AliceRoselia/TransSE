@@ -429,3 +429,6 @@ if __name__ == "__main__":
 #With label smoothing: (from version 26): 0.8654 (This is version 29.)
 
 #Label smoothing = 0.05: 0.8654
+
+
+#Trying pneumonia mnist: 0.8558
