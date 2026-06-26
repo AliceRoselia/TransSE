@@ -189,7 +189,7 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
-        x = self.squeeze_to_pool(x) #14
+        #x = self.squeeze_to_pool(x) #14
         
         
         
@@ -272,14 +272,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention1_1.pt")
+            torch.save(net.state_dict(),"Derma_SqueezeAttention2_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention1_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Derma_SqueezeAttention2_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
