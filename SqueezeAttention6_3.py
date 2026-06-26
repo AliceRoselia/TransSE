@@ -272,14 +272,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Pneumonia_SqueezeAttention1_1.pt")
+            torch.save(net.state_dict(),"Pneumonia_SqueezeAttention2_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Pneumonia_SqueezeAttention1_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Pneumonia_SqueezeAttention2_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
