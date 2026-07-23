@@ -250,7 +250,7 @@ best = 0
 #net.load_state_dict(pretrained)
 
 
-
+"""
 if __name__ == "__main__":
     for epoch in range(30):
         print("Current epoch:",epoch+1)
@@ -286,14 +286,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention30_1.pt")
-
+            torch.save(net.state_dict(),"Breast_SqueezeAttention33_1.pt")
+"""
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention30_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention26_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 

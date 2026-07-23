@@ -66,6 +66,8 @@ class SqueezeAttentionBlock(nn.Module):
         super(SqueezeAttentionBlock,self).__init__()
         assert n%head == 0
         self.channel_group_count = m
+        self.repnorm = nn.BatchNorm1d(n,affine=False)
+        #Give me normalized outputs. The linear layer does the weighing anyway.
         self.qk = nn.Linear(n,2*n)
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
@@ -90,6 +92,8 @@ class SqueezeAttentionBlock(nn.Module):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
         channel_reps = x.mean((3,4)) #dimension: B,M,N
+        #We will normalize ONLY between batches. Each channel has its own mean.
+        channel_reps = self.repnorm(channel_reps.view(B*M,N)).view(B,M,N)
         
         
         query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
@@ -284,14 +288,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention3_1.pt")
+            torch.save(net.state_dict(),"Derma_SqueezeAttention4_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention3_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Derma_SqueezeAttention4_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 

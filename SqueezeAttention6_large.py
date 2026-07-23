@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import DermaMNIST
+from medmnist import RetinaMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from muon import SingleDeviceMuonWithAuxAdam
@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(45768742)
+torch.manual_seed(45968741)
 
 torch.set_float32_matmul_precision("high")
 
@@ -39,7 +39,7 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = DermaMNIST(split="train",transform = transforms.Compose([
+train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -49,11 +49,11 @@ train_data = DermaMNIST(split="train",transform = transforms.Compose([
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = DermaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = DermaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -162,7 +162,8 @@ class SqueezeAttention(nn.Module):
         self.SAB14 = SqueezeAttentionBlock(8, 512)
         self.SAB15 = SqueezeAttentionBlock(8, 512)
         self.SAB16 = SqueezeAttentionBlock(8, 512)
-        
+        #self.SAB17 = SqueezeAttentionBlock(8, 512)
+        #self.SAB18 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
@@ -201,7 +202,8 @@ class SqueezeAttention(nn.Module):
         x = self.SAB14(x)
         x = self.SAB15(x)
         x = self.SAB16(x)
-        #x = self.squeeze_to_pool(x) #14
+        #x = self.SAB17(x)
+        #x = self.SAB18(x)
         
         
         
@@ -214,14 +216,14 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(3, 7).to("cuda")
+net = SqueezeAttention(3, 5).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
+hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.intro.weight, net.results.weight]
+nonhidden_params = [net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.00),
@@ -246,11 +248,10 @@ best = 0
 
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
-
-
+"""
 
 if __name__ == "__main__":
-    for epoch in range(10):
+    for epoch in range(20):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -284,19 +285,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention3_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention16_1.pt")
 
-
+"""
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention3_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention16_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 2005 
+    total = 400 
         
     net.eval()
     with torch.no_grad():
@@ -410,43 +411,8 @@ if __name__ == "__main__":
 #With another seed, 25 epochs: 
 # 0.615
 
-#Breast mnist: 0.814
+#Version 15: More layers!
+# 0.6075
 
-#With jitter = 0.3: 0.8526
-
-#With rotation = 30: 0.859
-
-#With more layers: 0.8718 (version 18.)
-
-#Version 19 got only like 0.78. Maybe the training got interrupted. Trying again.
-
-#Real version 19: 
-# 0.859
-
-#With even more layer (version 20): 0.782
-
-#Version 23: With adam for the first layer.
-#0.8077
-
-#Version 24: good validation, but only 0.8462 test.
-
-#Trying again, 30 epochs. 0.827
-
-#With dropout = 0.5 (4 blocks at the end): 0.878 (version 26)
-
-#With dropout = 0.5, 10 epochs, 3 blocks at the end: 0.82
-
-#With dropout = 0.5, 30 epochs, 6 blocks at the end: 0.859
-
-#With label smoothing: (from version 26): 0.8654 (This is version 29.)
-
-#Label smoothing = 0.05: 0.8654
-
-
-#Trying pneumonia mnist: 0.8558
-
-#Derma mnist: 0.7406
-
-#Derma mnist 2 (without max pooling before): 0.7387
-
-#Derma mnist 3 (With a few more layers): 0.745
+#Version 16 with more layers and dropout = 0.5: 0.5725
+# Version 16 (with more layers) dropout = 0.25: 0.625

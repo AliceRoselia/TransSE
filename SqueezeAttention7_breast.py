@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import DermaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from muon import SingleDeviceMuonWithAuxAdam
@@ -39,21 +39,21 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = DermaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
+    transforms.RandomRotation(30),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = DermaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = DermaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -66,6 +66,8 @@ class SqueezeAttentionBlock(nn.Module):
         super(SqueezeAttentionBlock,self).__init__()
         assert n%head == 0
         self.channel_group_count = m
+        self.repnorm = nn.BatchNorm1d(n,affine=False)
+        #Give me normalized outputs. The linear layer does the weighing anyway.
         self.qk = nn.Linear(n,2*n)
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
@@ -90,6 +92,8 @@ class SqueezeAttentionBlock(nn.Module):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
         channel_reps = x.mean((3,4)) #dimension: B,M,N
+        #We will normalize ONLY between batches. Each channel has its own mean.
+        channel_reps = self.repnorm(channel_reps.view(B*M,N)).view(B,M,N)
         
         
         query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
@@ -162,7 +166,8 @@ class SqueezeAttention(nn.Module):
         self.SAB14 = SqueezeAttentionBlock(8, 512)
         self.SAB15 = SqueezeAttentionBlock(8, 512)
         self.SAB16 = SqueezeAttentionBlock(8, 512)
-        
+        #self.SAB17 = SqueezeAttentionBlock(8, 512)
+        #self.SAB18 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
@@ -170,7 +175,7 @@ class SqueezeAttention(nn.Module):
         self.UP3 = UpProjection(128, 256)
         self.UP4 = UpProjection(256, 512)
         
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(0.5)
         
         self.results = nn.Linear(4096, classes)
     
@@ -201,7 +206,8 @@ class SqueezeAttention(nn.Module):
         x = self.SAB14(x)
         x = self.SAB15(x)
         x = self.SAB16(x)
-        #x = self.squeeze_to_pool(x) #14
+        #x = self.SAB17(x)
+        #x = self.SAB18(x)
         
         
         
@@ -214,7 +220,7 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(3, 7).to("cuda")
+net = SqueezeAttention(1, 2).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
@@ -250,7 +256,7 @@ best = 0
 
 
 if __name__ == "__main__":
-    for epoch in range(10):
+    for epoch in range(30):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -284,19 +290,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention3_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention32_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention3_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention32_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 2005 
+    total = 156 
         
     net.eval()
     with torch.no_grad():
@@ -442,11 +448,6 @@ if __name__ == "__main__":
 
 #Label smoothing = 0.05: 0.8654
 
+#With norm: 0.8269
 
-#Trying pneumonia mnist: 0.8558
-
-#Derma mnist: 0.7406
-
-#Derma mnist 2 (without max pooling before): 0.7387
-
-#Derma mnist 3 (With a few more layers): 0.745
+#With norm in a different way: 0.8526
