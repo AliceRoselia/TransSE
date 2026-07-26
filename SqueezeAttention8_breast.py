@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 from muon import SingleDeviceMuonWithAuxAdam
@@ -39,7 +39,7 @@ batch_size = 16
 num_workers = 4
 prefetch_factor = 8 
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
@@ -49,11 +49,11 @@ train_data = RetinaMNIST(split="train",transform = transforms.Compose([
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
 test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -158,14 +158,22 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
+        self.SAB13 = SqueezeAttentionBlock(8, 512)
+        self.SAB14 = SqueezeAttentionBlock(8, 512)
+        self.SAB15 = SqueezeAttentionBlock(8, 512)
+        self.SAB16 = SqueezeAttentionBlock(8, 512)
+        #self.SAB17 = SqueezeAttentionBlock(8, 512)
+        #self.SAB18 = SqueezeAttentionBlock(8, 512)
+        
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
+        self.UP4 = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(2048, classes)
+        self.results = nn.Linear(4096, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
@@ -188,10 +196,18 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
+        x = self.squeeze_to_pool(x) #14
+        x = self.UP4(x)
+        x = self.SAB13(x)
+        x = self.SAB14(x)
+        x = self.SAB15(x)
+        x = self.SAB16(x)
+        #x = self.SAB17(x)
+        #x = self.SAB18(x)
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,2048))
+        x = self.dropout(x.mean((3,4)).view(-1,4096))
         
         return self.results(x)
         
@@ -200,19 +216,19 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(3, 5).to("cuda")
+net = SqueezeAttention(1, 2).to("cuda")
 #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
+hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.results.weight]
+nonhidden_params = [net.intro.weight, net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.02),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.002),
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.005),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -234,8 +250,9 @@ best = 0
 #net.load_state_dict(pretrained)
 
 
+
 if __name__ == "__main__":
-    for epoch in range(20):
+    for epoch in range(30):
         print("Current epoch:",epoch+1)
     
         net.train()
@@ -269,19 +286,19 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention21_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention38_1.pt")
 
-        
+
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention21_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention38_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
     correct = 0
-    total = 400 
+    total = 156 
         
     net.eval()
     with torch.no_grad():
@@ -395,13 +412,44 @@ if __name__ == "__main__":
 #With another seed, 25 epochs: 
 # 0.615
 
-#Version 15: More layers!
-# 0.6075
+#Breast mnist: 0.814
 
-#Version 17: 0.6025
+#With jitter = 0.3: 0.8526
 
-#Try again (20 epochs): 0.545
+#With rotation = 30: 0.859
 
+#With more layers: 0.8718 (version 18.)
 
-#Heard you like param tunes? 0.5975 with weight decay = 0.02. Wait... wrong... that was lr=0.02
- 
+#Version 19 got only like 0.78. Maybe the training got interrupted. Trying again.
+
+#Real version 19: 
+# 0.859
+
+#With even more layer (version 20): 0.782
+
+#Version 23: With adam for the first layer.
+#0.8077
+
+#Version 24: good validation, but only 0.8462 test.
+
+#Trying again, 30 epochs. 0.827
+
+#With dropout = 0.5 (4 blocks at the end): 0.878 (version 26)
+
+#With dropout = 0.5, 10 epochs, 3 blocks at the end: 0.82
+
+#With dropout = 0.5, 30 epochs, 6 blocks at the end: 0.859
+
+#With label smoothing: (from version 26): 0.8654 (This is version 29.)
+
+#Label smoothing = 0.05: 0.8654
+
+#With norm: 0.8269
+
+#With norm in a different way: 0.8526
+
+#Weight decay = 0.01: 0.8462
+
+#Lower data augmentation: a0.8782
+
+#With weight decay = 0.03: 0.8782
