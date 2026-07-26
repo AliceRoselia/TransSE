@@ -212,7 +212,7 @@ param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.02),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.002),
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.02),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
