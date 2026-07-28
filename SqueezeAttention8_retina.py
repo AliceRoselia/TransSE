@@ -210,9 +210,9 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
-         lr=0.01, weight_decay=0.02),
+         lr=0.01, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.02),
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.001),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -404,4 +404,6 @@ if __name__ == "__main__":
 
 
 #Heard you like param tunes? 0.5975 with weight decay = 0.02. Wait... wrong... that was lr=0.02
- 
+# The best one is with lr = 0.01 and 0.001. (Version 19)
+
+#With lr = 0.02 on both: 0.6425

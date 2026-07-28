@@ -450,6 +450,8 @@ if __name__ == "__main__":
 
 #Weight decay = 0.01: 0.8462
 
-#Lower data augmentation: a0.8782
+#Lower data augmentation: 0.8782
 
 #With weight decay = 0.03: 0.8782
+
+#The best one is weight decay = (0.02, 0.002) (version 38.)
