@@ -26,8 +26,15 @@ torch.set_float32_matmul_precision("high")
 
 
 #TransSEnet for medical imaging and similar tasks.
+import math
 
-
+def schedule_LR(optimizer, epoch, max_epoch, muon_max, muon_min, adam_max, adam_min):
+    #Cosine annealing. Self-implemented because the Pytorch version can't accept when there are 2 versions.
+    for group in optimizer.param_groups:
+        if group["use_muon"]:
+            group["lr"] = muon_min + (1+math.cos(math.pi*epoch/max_epoch))*(muon_max-muon_min)/2
+        else:
+            group["lr"] = adam_min + (1+math.cos(math.pi*epoch/max_epoch))*(adam_max-adam_min)/2
     
 
         
@@ -228,7 +235,7 @@ param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.02),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.005),
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.002),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -249,14 +256,20 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-
+max_epoch = 30
+muon_max = 0.02
+muon_min = 0.005
+adam_max = 3e-4
+adam_min = 7.5e-5
 
 if __name__ == "__main__":
-    for epoch in range(30):
+    for epoch in range(max_epoch):
+        
         print("Current epoch:",epoch+1)
-    
+        schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
         net.train()
         batch = 0
+        
         for data_input, result in train_data_loader:
             batch += 1
             print("batch:",batch)
@@ -267,10 +280,6 @@ if __name__ == "__main__":
             
             optimizer.step()
             optimizer.zero_grad()
-            
-            
-            
-            #print(result_loss)
         
         net.eval()
         correct = 0
@@ -286,14 +295,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention38_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention41_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention38_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention41_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -455,3 +464,7 @@ if __name__ == "__main__":
 #With weight decay = 0.03: 0.8782
 
 #The best one is weight decay = (0.02, 0.002) (version 38.)
+
+#With weight decay = (0.02,0.005) and adjusted betas... not working. 0.833
+
+#With the adjusted betas alone... 0.8653. Not working.

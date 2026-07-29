@@ -212,7 +212,7 @@ param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.001),
+         lr=1.5e-4, betas=(0.9, 0.95), weight_decay=0.001),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -269,14 +269,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention21_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention22_1.pt")
 
         
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention21_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention22_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -407,3 +407,5 @@ if __name__ == "__main__":
 # The best one is with lr = 0.01 and 0.001. (Version 19)
 
 #With lr = 0.02 on both: 0.6425
+
+#Version 22: with changed betas: 0.655

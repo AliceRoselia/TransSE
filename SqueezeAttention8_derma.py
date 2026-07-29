@@ -450,3 +450,5 @@ if __name__ == "__main__":
 #Derma mnist 2 (without max pooling before): 0.7387
 
 #Derma mnist 3 (With a few more layers): 0.745
+
+#Derma mnist 5 (with weight decay): 0.7406
