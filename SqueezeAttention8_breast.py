@@ -233,9 +233,9 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.intro.weight, net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
-         lr=0.01, weight_decay=0.02),
+         lr=0.01, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.002),
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.001),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -295,14 +295,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention41_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention42_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention41_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention42_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -468,3 +468,7 @@ if __name__ == "__main__":
 #With weight decay = (0.02,0.005) and adjusted betas... not working. 0.833
 
 #With the adjusted betas alone... 0.8653. Not working.
+
+#With weight decay = (0.02, 0.002): 0.8717
+
+#With weight decay = (0.01, 0.001): 0.8910
