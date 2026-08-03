@@ -425,7 +425,7 @@ if __name__ == "__main__":
 
 #With lr = 0.02 on both: 0.6425
 
-#Version 22: with changed betas: 0.655
+#Version 22: with changed betas to (0.9, 0.95): 0.655
 
 #Version 23: 0.62
 
