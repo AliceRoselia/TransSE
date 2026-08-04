@@ -110,6 +110,8 @@ class SqueezeAttentionBlock(nn.Module):
         attn = func.softmax(scores,dim=-1)
         
         attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
+        
+        #TODO: add local gate.
         #print(self.scale.device)
         
         
@@ -243,7 +245,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-
+"""
 max_epoch = 20
 muon_max = 0.02
 muon_min = 0.01
@@ -288,12 +290,12 @@ if __name__ == "__main__":
             print("New frontier reached.")
             torch.save(net.state_dict(),"Retina_SqueezeAttention25_1.pt")
 
-        
+"""
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention25_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention19_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -430,3 +432,5 @@ if __name__ == "__main__":
 #Version 23: 0.62
 
 #Version 24: 0.6025
+
+#Version 25: 0.595
