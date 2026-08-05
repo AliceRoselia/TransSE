@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(3768149721)
+torch.manual_seed(4263278522)
 
 torch.set_float32_matmul_precision("high")
 
@@ -297,14 +297,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention43_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention44_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention43_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention44_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 

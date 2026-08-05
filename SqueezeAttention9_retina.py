@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(4263278522)
+torch.manual_seed(123456789)
 
 torch.set_float32_matmul_precision("high")
 
@@ -78,7 +78,7 @@ class SqueezeAttentionBlock(nn.Module):
         self.channel_group_count = m
         self.qk = nn.Linear(n,2*n)
         self.heads = head
-        self.value_conv = nn.Conv2d(n, n, 1)
+        self.value_conv = nn.Conv2d(n, 2*n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
         self.conv = nn.Conv2d(n, n, 3, padding = "same")
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
@@ -102,16 +102,16 @@ class SqueezeAttentionBlock(nn.Module):
         channel_reps = x.mean((3,4)) #dimension: B,M,N
         
         
-        query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
-        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
+        query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head
+        value, filter_layer = self.value_conv(x.view(B*M,N,H,W)).chunk(2,dim=1)
+        
+        value = value.view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
         
         scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
         
         attn = func.softmax(scores,dim=-1)
         
         attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
-        
-        #TODO: add local gate.
         #print(self.scale.device)
         
         
@@ -123,7 +123,7 @@ class SqueezeAttentionBlock(nn.Module):
         
        #with sdpa_kernel(backends=[SDPBackend.MATH]):
             #attention_result = func.scaled_dot_product_attention(query,key,value).view(B,M,N,H,W)
-        attention_result = attention_result.reshape(B,M,N,H,W) + x
+        attention_result = attention_result.reshape(B,M,N,H,W)*func.sigmoid(filter_layer.view(B,M,N,H,W)) + x
         attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
         
         attention_result = self.bn2(self.fused_conv_activation(attention_result).view(B,M*N,H,W))
@@ -245,18 +245,18 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-"""
-max_epoch = 20
-muon_max = 0.02
-muon_min = 0.01
-adam_max = 3e-4
-adam_min = 1.5e-4
+
+max_epoch = 30
+#muon_max = 0.02
+#muon_min = 0.01
+#adam_max = 3e-4
+#adam_min = 1.5e-4
 
 if __name__ == "__main__":
     for epoch in range(max_epoch):
         
         print("Current epoch:",epoch+1)
-        schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
+        #schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
         net.train()
         batch = 0
         for data_input, result in train_data_loader:
@@ -288,14 +288,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention25_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention26_1.pt")
 
-"""
+
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention19_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention26_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -434,3 +434,5 @@ if __name__ == "__main__":
 #Version 24: 0.6025
 
 #Version 25: 0.595
+
+#Version 26 (gated): 0.6525
