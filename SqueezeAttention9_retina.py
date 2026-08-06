@@ -436,3 +436,5 @@ if __name__ == "__main__":
 #Version 25: 0.595
 
 #Version 26 (gated): 0.6525
+
+#Version 27 (gated, 30 epochs): 0.6225
