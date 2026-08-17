@@ -45,7 +45,7 @@ def schedule_LR(optimizer, epoch, max_epoch, muon_max, muon_min, adam_max, adam_
 #a flexible attention.
 
     
-batch_size = 16
+batch_size = 12
 num_workers = 4
 prefetch_factor = 8 
 
@@ -203,13 +203,13 @@ class SqueezeAttention(nn.Module):
         x = self.SAB12(x)
         
         x = x.view(-1,8*256,28,28)
-        x = func.avg_pool2d(x, (4,4)).view(-1,2048*7*7)
+        x = func.max_pool2d(x, (4,4)).view(-1,2048*7*7)
         
         
         
         x = self.dropout(x)
         
-        return self.results(x.detach())
+        return self.result_out(x.detach())
         
         
         
@@ -223,7 +223,7 @@ net = SqueezeAttention(3, 5).to("cuda")
 
 hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.results.weight]
+nonhidden_params = [net.result_out.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.01),
@@ -255,6 +255,9 @@ max_epoch = 5
 #muon_min = 0.01
 #adam_max = 3e-4
 #adam_min = 1.5e-4
+
+pretrained = torch.load("Retina_SqueezeAttention19_1.pt")
+net.load_state_dict(pretrained,strict=False)
 
 if __name__ == "__main__":
     for epoch in range(max_epoch):
@@ -292,14 +295,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention19_new_feature_extractor_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention19_new_feature_extractor_2.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention19_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention19_new_feature_extractor_2.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -438,3 +441,7 @@ if __name__ == "__main__":
 #Version 24: 0.6025
 
 #Version 25: 0.595
+
+#With average pooling: 0.5875
+
+#with max pooling: 0.6075
