@@ -177,7 +177,7 @@ class SqueezeAttention(nn.Module):
         self.UP3 = UpProjection(128, 256)
         self.UP_OUT = UpProjection(256, 1024)
         
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(0.5)
         
         self.results = nn.Linear(8192, classes)
     
@@ -292,13 +292,13 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention27_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention28_1.pt")
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention27_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention28_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -437,3 +437,5 @@ if __name__ == "__main__":
 #Version 24: 0.6025
 
 #Version 25: 0.595
+
+#Version 26: 0.6125 (try up-sizing output)
