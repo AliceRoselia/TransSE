@@ -224,7 +224,7 @@ param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.001),
+         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.01),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -245,18 +245,18 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-"""
+
 max_epoch = 20
-muon_max = 0.02
-muon_min = 0.01
-adam_max = 3e-4
-adam_min = 1.5e-4
+#muon_max = 0.02
+#muon_min = 0.01
+#adam_max = 3e-4
+#adam_min = 1.5e-4
 
 if __name__ == "__main__":
     for epoch in range(max_epoch):
         
         print("Current epoch:",epoch+1)
-        schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
+        #schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
         net.train()
         batch = 0
         for data_input, result in train_data_loader:
@@ -288,14 +288,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention25_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention33_1.pt")
 
-"""
+
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention19_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention33_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -423,7 +423,7 @@ if __name__ == "__main__":
 
 
 #Heard you like param tunes? 0.5975 with weight decay = 0.02. Wait... wrong... that was lr=0.02
-# The best one is with lr = 0.01 and 0.001. (Version 19)
+# The best one is with lr = 0.01 and 0.001. (Version 19), 0.655
 
 #With lr = 0.02 on both: 0.6425
 
@@ -434,3 +434,5 @@ if __name__ == "__main__":
 #Version 24: 0.6025
 
 #Version 25: 0.595
+
+#Version 33: 0.585

@@ -175,11 +175,11 @@ class SqueezeAttention(nn.Module):
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP_OUT = UpProjection(256, 1024)
+        self.UP_OUT = UpProjection(256, 256)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(8192, classes)
+        self.results = nn.Linear(2048, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
@@ -207,7 +207,7 @@ class SqueezeAttention(nn.Module):
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,8192))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -292,13 +292,13 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention29_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention32_1.pt")
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention29_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention32_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -441,3 +441,13 @@ if __name__ == "__main__":
 #Version 26: 0.6125 (try up-sizing output)
 
 #Version 27: 0.5775 (More dropout-worse?)
+
+#Version 28: 0.635 (weight decay out = 0.005)
+
+#Version 29: 0.6075
+
+#Version 30: 0.6225
+
+#Version 31: 0.645
+
+#Version 32: 0.6175 (High validation BUT low real accuracy?)
