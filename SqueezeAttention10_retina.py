@@ -228,7 +228,7 @@ param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=0.01, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.005),
+         lr=0.001, betas=(0.9, 0.99), weight_decay=0.005),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -250,12 +250,12 @@ best = 0
 #net.load_state_dict(pretrained)
 
 
-max_epoch = 20
+max_epoch = 40
 #muon_max = 0.02
 #muon_min = 0.01
 #adam_max = 3e-4
 #adam_min = 1.5e-4
-
+"""
 if __name__ == "__main__":
     for epoch in range(max_epoch):
         
@@ -292,13 +292,12 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention32_1.pt")
-
-
+            torch.save(net.state_dict(),"Retina_SqueezeAttention36_1.pt")
+"""
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention32_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention36_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -451,3 +450,7 @@ if __name__ == "__main__":
 #Version 31: 0.645
 
 #Version 32: 0.6175 (High validation BUT low real accuracy?)
+
+#Version 34: 0.6325
+
+#Version 36: 0.625
