@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(4263278522)
+torch.manual_seed(91876371)
 
 torch.set_float32_matmul_precision("high")
 
@@ -45,9 +45,9 @@ def schedule_LR(optimizer, epoch, max_epoch, muon_max, muon_min, adam_max, adam_
 #a flexible attention.
 
     
-batch_size = 16
+batch_size = 2
 num_workers = 4
-prefetch_factor = 8 
+prefetch_factor = 24
 
 train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
@@ -63,9 +63,7 @@ val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=Tr
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
-test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
+
 
 
 #Use torch.nn.functional.scaled_dot_product_attention
@@ -175,11 +173,11 @@ class SqueezeAttention(nn.Module):
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP_OUT = UpProjection(256, 256)
+        self.UP_OUT = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(2048, classes)
+        self.results = nn.Linear(4096, classes)
     
     def forward(self,x):
         B,C,H,W = x.shape
@@ -207,7 +205,7 @@ class SqueezeAttention(nn.Module):
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,2048))
+        x = self.dropout(x.mean((3,4)).view(-1,4096))
         
         return self.results(x)
         
@@ -226,9 +224,9 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
-         lr=0.01, weight_decay=0.01),
+         lr=0.001, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=0.001, betas=(0.9, 0.99), weight_decay=0.005),
+         lr=1.5e-5, betas=(0.9, 0.99), weight_decay=0.005),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -250,12 +248,12 @@ best = 0
 #net.load_state_dict(pretrained)
 
 
-max_epoch = 40
+max_epoch = 20
 #muon_max = 0.02
 #muon_min = 0.01
 #adam_max = 3e-4
 #adam_min = 1.5e-4
-"""
+
 if __name__ == "__main__":
     for epoch in range(max_epoch):
         
@@ -265,7 +263,8 @@ if __name__ == "__main__":
         batch = 0
         for data_input, result in train_data_loader:
             batch += 1
-            print("batch:",batch)
+            if batch % 100 == 0:
+                print("batch:",batch, "reached")
             result = result.to("cuda",non_blocking = True)
             prediction = net(data_input.to("cuda",non_blocking = True))
             result_loss = loss(prediction,result.view(-1))
@@ -292,12 +291,16 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention36_1.pt")
-"""
+            torch.save(net.state_dict(),"Retina_SqueezeAttention40_1.pt")
+
 #This section is deliberately separate in case we want to just evaluate the model.
 
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
+pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
+
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention36_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention40_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -454,3 +457,7 @@ if __name__ == "__main__":
 #Version 34: 0.6325
 
 #Version 36: 0.625
+
+#Version 40: 0.5175
+
+#Version 41: 0.635

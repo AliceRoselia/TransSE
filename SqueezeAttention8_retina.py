@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(9187637)
+torch.manual_seed(9127637)
 
 torch.set_float32_matmul_precision("high")
 
@@ -45,9 +45,10 @@ def schedule_LR(optimizer, epoch, max_epoch, muon_max, muon_min, adam_max, adam_
 #a flexible attention.
 
     
-batch_size = 4
+batch_size = 2
 num_workers = 4
-prefetch_factor = 16 
+prefetch_factor = 24
+nontrain_prefetch_factor = 4
 
 train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
@@ -63,9 +64,7 @@ val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=Tr
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
-test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
+
 
 
 #Use torch.nn.functional.scaled_dot_product_attention
@@ -222,9 +221,9 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
-         lr=0.01, weight_decay=0.01),
+         lr=0.001, weight_decay=0.01),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-4, betas=(0.9, 0.99), weight_decay=0.001),
+         lr=1.5e-5, betas=(0.9, 0.99), weight_decay=0.001),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -260,7 +259,8 @@ if __name__ == "__main__":
         batch = 0
         for data_input, result in train_data_loader:
             batch += 1
-            print("batch:",batch)
+            if batch % 100 == 0:
+                print("batch:",batch, "reached")
             result = result.to("cuda",non_blocking = True)
             prediction = net(data_input.to("cuda",non_blocking = True))
             result_loss = loss(prediction,result.view(-1))
@@ -287,14 +287,18 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention37_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention41_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
+test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
+test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
+pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
+
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention37_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention41_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -437,3 +441,9 @@ if __name__ == "__main__":
 #Version 33: 0.585
 
 #Version 35: 0.575
+
+#Version 37: 0.585
+
+#Version 38: 0.5975
+
+#Version 39: 0.58
