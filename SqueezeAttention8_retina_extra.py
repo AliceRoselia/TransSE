@@ -21,7 +21,7 @@ torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(2192537)
+torch.manual_seed(9127637)
 
 torch.set_float32_matmul_precision("high")
 
@@ -89,7 +89,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.silu(self.conv(x))
+        return x + func.silu(self.conv2(func.silu(self.conv(x))))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
@@ -222,11 +222,9 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
-         lr=0.001, weight_decay=0.01),
-    dict(params=hidden_gains_biases, use_muon=False,
-         lr=1.0e-4, betas=(0.9, 0.99), weight_decay=0.001),
-    dict(params=nonhidden_params, use_muon=False,
-         lr=1.0e-3, betas=(0.9, 0.99), weight_decay=0.001)
+         lr=0.002, weight_decay=0.01),
+    dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
+         lr=3e-5, betas=(0.9, 0.98), weight_decay=0.001),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -247,7 +245,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 10
+max_epoch = 20
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -292,7 +290,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention43_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention42_1.pt")
 
 
 
@@ -303,7 +301,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention43_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention42_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -456,5 +454,3 @@ if __name__ == "__main__":
 #Version 41: 0.585
 
 #Version 42: 0.6125 (Add extra block)
-
-#Version 43: 0.5075
