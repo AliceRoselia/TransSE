@@ -17,6 +17,7 @@ from muon import SingleDeviceMuonWithAuxAdam
 torch._dynamo.config.recompile_limit = 128
 torch._dynamo.config.cache_size_limit = 128 
 torch._dynamo.config.accumulated_cache_size_limit = 128
+torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -47,8 +48,7 @@ def schedule_LR(optimizer, epoch, max_epoch, muon_max, muon_min, adam_max, adam_
     
 batch_size = 2
 num_workers = 4
-prefetch_factor = 24
-nontrain_prefetch_factor = 4
+prefetch_factor = 32
 
 train_data = RetinaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
@@ -94,7 +94,7 @@ class SqueezeAttentionBlock(nn.Module):
         #return self.pw_conv(self.dw_conv(x))
     
     
-    @torch.compile()
+    #@torch.compile()
     def forward(self,x):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
@@ -177,7 +177,7 @@ class SqueezeAttention(nn.Module):
         self.dropout = nn.Dropout(0.25)
         
         self.results = nn.Linear(2048, classes)
-    
+    @torch.compile()
     def forward(self,x):
         B,C,H,W = x.shape
         x = self.intro(x).view(B,8,32,H,W)
@@ -221,9 +221,9 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.results.weight]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
-         lr=0.001, weight_decay=0.01),
+         lr=0.0008, weight_decay=0.015),
     dict(params=hidden_gains_biases+nonhidden_params, use_muon=False,
-         lr=1.5e-5, betas=(0.9, 0.99), weight_decay=0.001),
+         lr=1.2e-5, betas=(0.9, 0.99), weight_decay=0.0015),
 ]
 optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
@@ -244,7 +244,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 20
+max_epoch = 50
 #muon_max = 0.02
 #muon_min = 0.01
 #adam_max = 3e-4
@@ -287,7 +287,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention41_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention42_1.pt")
 
 
 
@@ -298,7 +298,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention41_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention42_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -447,3 +447,5 @@ if __name__ == "__main__":
 #Version 38: 0.5975
 
 #Version 39: 0.58
+
+#Version 41: 0.585
