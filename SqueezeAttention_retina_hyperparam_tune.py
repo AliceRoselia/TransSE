@@ -249,7 +249,7 @@ hyperparams = np.array([0.001,0.01,1.0e-4,1-0.9,1-0.99,0.01,1.0e-4,1-0.9,1-0.99,
 if __name__ == "__main__":
     for epoch in range(max_tries):
         
-        hyperparam_update = hyperparams*np.clip(0.1*np.exp((-epoch*2.30258509299)/(max_tries+1))*np.random.randn(10),0.0,2.0)
+        hyperparam_update = hyperparams*np.clip(0.1*np.exp((-epoch*2.30258509299)/(max_tries+1))*np.random.randn(10),-1.0,1.0)
         
         
         #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
