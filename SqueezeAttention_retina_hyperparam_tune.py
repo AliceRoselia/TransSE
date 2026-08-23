@@ -22,7 +22,7 @@ torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(3292537)
+torch.manual_seed(3292536)
 
 torch.set_float32_matmul_precision("high")
 
@@ -235,7 +235,7 @@ loss = nn.CrossEntropyLoss()
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_tries = 300
+max_tries = 200
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -243,7 +243,8 @@ max_tries = 300
 #adam_min = 7.5e-5
 
 import numpy as np
-hyperparams = np.array([0.001,0.01,1.0e-4,1-0.9,1-0.99,0.01,1.0e-4,1-0.9,1-0.99,0.1])
+hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
+ 0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
 
 
 if __name__ == "__main__":
@@ -345,12 +346,12 @@ if __name__ == "__main__":
                 correct_negative += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
         
         
-        hyperparams += hyperparam_update*(0.1*np.clip((correct_positive-correct_negative),-10,10))
+        hyperparams += hyperparam_update*(0.05*np.clip((correct_positive-correct_negative),-20,20))
         
         print("positive:", correct_positive)
         print("negative:", correct_negative)
         
-        print(hyperparams)
+        print([float(i) for i in hyperparams])
             
             
 
