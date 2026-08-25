@@ -22,7 +22,7 @@ torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(42568712)
+torch.manual_seed(42528744)
 
 torch.set_float32_matmul_precision("high")
 
@@ -223,9 +223,11 @@ hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.results.weight]
 
 
-hyperparams = [1.00663457e-03, 1.00120680e-02, 1.12677415e-04, 1.02503806e-01,
- 1.31625708e-02, 8.86276568e-03, 5.03050078e-05, 1.09865157e-01,
- 9.68306067e-03, 1.08889997e-01]
+#hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
+
+hyperparams = [0.0012167701731776715, 0.009882326677444367, 0.0001056057800008924, 
+               0.09433250146158167, 0.01015242167527684, 0.007936405066033363, 
+               2.9816927933194033e-05, 0.1273760814379515, 0.006463479536905024, 0.09381146079130265]
 
 
 param_groups = [
@@ -256,7 +258,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 300
+max_epoch = 100
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -467,3 +469,5 @@ if __name__ == "__main__":
 #Version 42: 0.6125 (Add extra block)
 
 #Version 43: 0.6525
+
+#Version 44: 0.62

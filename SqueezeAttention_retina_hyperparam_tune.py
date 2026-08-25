@@ -235,7 +235,7 @@ loss = nn.CrossEntropyLoss()
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_tries = 200
+max_tries = 100
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -243,8 +243,13 @@ max_tries = 200
 #adam_min = 7.5e-5
 
 import numpy as np
+"""
 hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
  0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
+"""
+hyperparams = np.array([0.0011825425124263385, 0.010330355418826046, 9.717010527719703e-05, 
+               0.095310896089692, 0.011066199516048543, 0.007659887975184604, 
+               2.993036840108272e-05, 0.14800032499689056, 0.00635132065546346, 0.07318008992083])
 
 
 if __name__ == "__main__":
@@ -276,18 +281,20 @@ if __name__ == "__main__":
 
         net.train()
         #batch = 0
-        for data_input, result in train_data_loader:
+        for sub_epoch in range(3):
             
-            #batch += 1
-            #if batch % 100 == 0:
-                #print("batch:",batch, "reached")
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            result_loss = loss(prediction,result.view(-1))
-            result_loss.backward()
-            
-            optimizer.step()
-            optimizer.zero_grad()
+            for data_input, result in train_data_loader:
+                
+                #batch += 1
+                #if batch % 100 == 0:
+                    #print("batch:",batch, "reached")
+                result = result.to("cuda",non_blocking = True)
+                prediction = net(data_input.to("cuda",non_blocking = True))
+                result_loss = loss(prediction,result.view(-1))
+                result_loss.backward()
+                
+                optimizer.step()
+                optimizer.zero_grad()
             
             
             
@@ -320,18 +327,20 @@ if __name__ == "__main__":
         
         net.train()
         #batch = 0
-        for data_input, result in train_data_loader:
+        for sub_epoch in range(3):
             
-            #batch += 1
-            #if batch % 100 == 0:
-                #print("batch:",batch, "reached")
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            result_loss = loss(prediction,result.view(-1))
-            result_loss.backward()
-            
-            optimizer.step()
-            optimizer.zero_grad()
+            for data_input, result in train_data_loader:
+                
+                #batch += 1
+                #if batch % 100 == 0:
+                    #print("batch:",batch, "reached")
+                result = result.to("cuda",non_blocking = True)
+                prediction = net(data_input.to("cuda",non_blocking = True))
+                result_loss = loss(prediction,result.view(-1))
+                result_loss.backward()
+                
+                optimizer.step()
+                optimizer.zero_grad()
             
             
             
