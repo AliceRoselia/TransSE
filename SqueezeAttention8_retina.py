@@ -22,7 +22,7 @@ torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(42528744)
+torch.manual_seed(27802960)
 
 torch.set_float32_matmul_precision("high")
 
@@ -175,6 +175,7 @@ class SqueezeAttention(nn.Module):
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
+        #self.UP_OUT = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
@@ -202,6 +203,8 @@ class SqueezeAttention(nn.Module):
         x = self.SAB11(x)
         x = self.SAB12(x)
         
+        #x = func.silu(self.UP_OUT(x))
+        
         
         
         x = self.dropout(x.mean((3,4)).view(-1,2048))
@@ -225,9 +228,9 @@ nonhidden_params = [net.results.weight]
 
 #hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
 
-hyperparams = [0.0012167701731776715, 0.009882326677444367, 0.0001056057800008924, 
-               0.09433250146158167, 0.01015242167527684, 0.007936405066033363, 
-               2.9816927933194033e-05, 0.1273760814379515, 0.006463479536905024, 0.09381146079130265]
+hyperparams = [0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763,
+               0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
+               2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 0.07000432048238599]
 
 
 param_groups = [
@@ -258,7 +261,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 100
+max_epoch = 50
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -470,4 +473,4 @@ if __name__ == "__main__":
 
 #Version 43: 0.6525
 
-#Version 44: 0.62
+#Version 44: 0.6275

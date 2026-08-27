@@ -247,9 +247,10 @@ import numpy as np
 hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
  0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
 """
-hyperparams = np.array([0.0011825425124263385, 0.010330355418826046, 9.717010527719703e-05, 
-               0.095310896089692, 0.011066199516048543, 0.007659887975184604, 
-               2.993036840108272e-05, 0.14800032499689056, 0.00635132065546346, 0.07318008992083])
+hyperparams = np.array([0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763, 
+                        0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
+                        2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 
+                        0.07000432048238599])
 
 
 if __name__ == "__main__":
@@ -280,8 +281,9 @@ if __name__ == "__main__":
         optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
         net.train()
+        correct_positive = 0
         #batch = 0
-        for sub_epoch in range(3):
+        for sub_epoch in range(5):
             
             for data_input, result in train_data_loader:
                 
@@ -300,13 +302,12 @@ if __name__ == "__main__":
             
             #print(result_loss)
         
-        net.eval()
-        correct_positive = 0
-        with torch.no_grad():
-            for data_input, result in val_data_loader:
-                result = result.to("cuda",non_blocking = True)
-                prediction = net(data_input.to("cuda",non_blocking = True))
-                correct_positive += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
+            net.eval()
+            with torch.no_grad():
+                for data_input, result in val_data_loader:
+                    result = result.to("cuda",non_blocking = True)
+                    prediction = net(data_input.to("cuda",non_blocking = True))
+                    correct_positive += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
         
         
         
@@ -326,8 +327,9 @@ if __name__ == "__main__":
         optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
         
         net.train()
+        correct_negative = 0
         #batch = 0
-        for sub_epoch in range(3):
+        for sub_epoch in range(5):
             
             for data_input, result in train_data_loader:
                 
@@ -346,19 +348,18 @@ if __name__ == "__main__":
             
             #print(result_loss)
         
-        net.eval()
-        correct_negative = 0
-        with torch.no_grad():
-            for data_input, result in val_data_loader:
-                result = result.to("cuda",non_blocking = True)
-                prediction = net(data_input.to("cuda",non_blocking = True))
-                correct_negative += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
+            net.eval()
+            with torch.no_grad():
+                for data_input, result in val_data_loader:
+                    result = result.to("cuda",non_blocking = True)
+                    prediction = net(data_input.to("cuda",non_blocking = True))
+                    correct_negative += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
         
         
-        hyperparams += hyperparam_update*(0.05*np.clip((correct_positive-correct_negative),-20,20))
+        hyperparams += hyperparam_update*(0.05*np.clip((correct_positive-correct_negative)/5,-20.0,20.0))
         
-        print("positive:", correct_positive)
-        print("negative:", correct_negative)
+        print("positive:", correct_positive/5)
+        print("negative:", correct_negative/5)
         
         print([float(i) for i in hyperparams])
             

@@ -174,6 +174,7 @@ class SqueezeAttention(nn.Module):
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
+        self.UP_OUT = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
