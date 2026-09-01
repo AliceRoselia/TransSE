@@ -282,7 +282,7 @@ if __name__ == "__main__":
         print("Current try:",epoch+1)
         
         new_hyperparams = hyperparams + hyperparam_update
-        net = SqueezeAttention(3, 5).to("cuda")
+        net = SqueezeAttention(1, 2).to("cuda")
         hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
         hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
         nonhidden_params = [net.results.weight]
@@ -328,7 +328,7 @@ if __name__ == "__main__":
         
         
         new_hyperparams = hyperparams - hyperparam_update
-        net = SqueezeAttention(3, 5).to("cuda")
+        net = SqueezeAttention(1, 2).to("cuda")
         hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
         hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
         nonhidden_params = [net.results.weight]
