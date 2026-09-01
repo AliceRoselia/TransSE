@@ -22,7 +22,7 @@ torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(3292536)
+torch.manual_seed(52219877)
 
 torch.set_float32_matmul_precision("high")
 
@@ -235,7 +235,7 @@ loss = nn.CrossEntropyLoss()
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_tries = 100
+max_tries = 50
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -246,17 +246,31 @@ import numpy as np
 """
 hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
  0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
-"""
+
 hyperparams = np.array([0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763, 
                         0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
                         2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 
                         0.07000432048238599])
 
+hyperparams = np.array([0.001245527330033001, 0.010438219276776779, 0.00012316657214343646, 
+                        0.09222319523977808, 0.011697029098213064, 0.008192746392646494, 
+                        2.988487054316161e-05, 0.14964307471776855, 0.0054507324210884235, 
+                        0.06940832929434097])
 
+
+hyperparams = np.array([0.0013379188749882236, 0.007627558100355931, 0.00022356712636061282, 
+                       0.0609025571239353, 0.006848890776896713, 0.01316613334303621, 
+                       1.4400515000397279e-05, 0.0995618412859407, 0.0045156141421254905, 
+                       0.07122638926202347])
+"""
+hyperparams = np.array([0.0022443332150382162, 0.005144466831288332, 3.233003581006977e-05,
+                        0.04954685101372992, 0.01419429600788806, 0.0017545040377340594,
+                        1.423908427033411e-05, 0.3231503419580622, 0.0024723986019527834,
+                        0.03852306426142474])
 if __name__ == "__main__":
     for epoch in range(max_tries):
         
-        hyperparam_update = hyperparams*np.clip(0.1*np.exp((-epoch*2.30258509299)/(max_tries+1))*np.random.randn(10),-1.0,1.0)
+        hyperparam_update = hyperparams*np.clip(0.15*np.exp((-epoch*2.30258509299)/(max_tries+1))*np.random.randn(10),-1.0,1.0)
         
         
         #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
@@ -356,7 +370,7 @@ if __name__ == "__main__":
                     correct_negative += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
         
         
-        hyperparams += hyperparam_update*(0.05*np.clip((correct_positive-correct_negative)/5,-20.0,20.0))
+        hyperparams += hyperparam_update*(0.2*np.clip((correct_positive-correct_negative)/5,-5.0,5.0))
         
         print("positive:", correct_positive/5)
         print("negative:", correct_negative/5)

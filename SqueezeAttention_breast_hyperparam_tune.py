@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as func
 
-from medmnist import RetinaMNIST
+from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
 #from torch_optimizer import Lookahead
@@ -22,7 +22,7 @@ torch._dynamo.config.compiled_autograd = True
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(21111362)
+torch.manual_seed(52219877)
 
 torch.set_float32_matmul_precision("high")
 
@@ -51,17 +51,17 @@ batch_size = 2
 num_workers = 4
 prefetch_factor = 40
 
-train_data = RetinaMNIST(split="train",transform = transforms.Compose([
+train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(20),
+    transforms.RandomRotation(15),
     transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
     # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
-val_data = RetinaMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
+val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
 val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
@@ -171,22 +171,14 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
-        self.SAB13 = SqueezeAttentionBlock(8, 512)
-        self.SAB14 = SqueezeAttentionBlock(8, 512)
-        self.SAB15 = SqueezeAttentionBlock(8, 512)
-        self.SAB16 = SqueezeAttentionBlock(8, 512)
-        #self.SAB17 = SqueezeAttentionBlock(8, 512)
-        #self.SAB18 = SqueezeAttentionBlock(8, 512)
-        
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP4 = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(4096, classes)
+        self.results = nn.Linear(2048, classes)
     @torch.compile()
     def forward(self,x):
         B,C,H,W = x.shape
@@ -209,18 +201,10 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
-        x = self.squeeze_to_pool(x) #14
-        x = self.UP4(x)
-        x = self.SAB13(x)
-        x = self.SAB14(x)
-        x = self.SAB15(x)
-        x = self.SAB16(x)
-        #x = self.SAB17(x)
-        #x = self.SAB18(x)
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,4096))
+        x = self.dropout(x.mean((3,4)).view(-1,2048))
         
         return self.results(x)
         
@@ -229,35 +213,10 @@ class SqueezeAttention(nn.Module):
 
 
 
-net = SqueezeAttention(1, 2).to("cuda")
+#net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
-hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.results.weight]
-
-
-#hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
-"""
-hyperparams = [0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763,
-               0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
-               2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 0.07000432048238599]
-
-"""
-
-#hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
-hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
-
-param_groups = [
-    dict(params=hidden_weights, use_muon=True,
-         lr=hyperparams[0], weight_decay=hyperparams[1]),
-    dict(params=hidden_gains_biases, use_muon=False,
-         lr=hyperparams[2], betas=(1-hyperparams[3], 1-hyperparams[4]), weight_decay=hyperparams[5]),
-    dict(params=nonhidden_params, use_muon=False,
-         lr=hyperparams[6], betas=(1-hyperparams[7], 1-hyperparams[8]), weight_decay=hyperparams[9])
-]
-optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 #optimizer = Lookahead(optimizer,k=8)
 
 #optimizer = torch.optim.Muon(net.parameters(),weight_decay = 0.0,lr = 1.5e-4,adjust_lr_fn = "match_rms_adamw")
@@ -272,233 +231,154 @@ loss = nn.CrossEntropyLoss()
 
 #net.load_state_dict(pretrained,strict=False)
 
-best = 0
 
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 100
+max_tries = 50
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
 #adam_max = 1.5e-4
 #adam_min = 7.5e-5
 
+import numpy as np
+"""
+hyperparams = np.array([0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
+ 0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944])
+
+hyperparams = np.array([0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763, 
+                        0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
+                        2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 
+                        0.07000432048238599])
+
+hyperparams = np.array([0.001245527330033001, 0.010438219276776779, 0.00012316657214343646, 
+                        0.09222319523977808, 0.011697029098213064, 0.008192746392646494, 
+                        2.988487054316161e-05, 0.14964307471776855, 0.0054507324210884235, 
+                        0.06940832929434097])
+
+
+hyperparams = np.array([0.0013379188749882236, 0.007627558100355931, 0.00022356712636061282, 
+                       0.0609025571239353, 0.006848890776896713, 0.01316613334303621, 
+                       1.4400515000397279e-05, 0.0995618412859407, 0.0045156141421254905, 
+                       0.07122638926202347])
+"""
+
+
+hyperparams = np.array([0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763,
+               0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
+               2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 0.07000432048238599])
+
 if __name__ == "__main__":
-    for epoch in range(max_epoch):
+    for epoch in range(max_tries):
         
-        print("Current epoch:",epoch+1)
-        #schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
+        hyperparam_update = hyperparams*np.clip(0.15*np.exp((-epoch*2.30258509299)/(max_tries+1))*np.random.randn(10),-1.0,1.0)
+        
+        
+        #net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
+
+        #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
+        
+        print("Current try:",epoch+1)
+        
+        new_hyperparams = hyperparams + hyperparam_update
+        net = SqueezeAttention(3, 5).to("cuda")
+        hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
+        hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
+        nonhidden_params = [net.results.weight]
+        param_groups = [
+            dict(params=hidden_weights, use_muon=True,
+                 lr=new_hyperparams[0], weight_decay=new_hyperparams[1]),
+            dict(params=hidden_gains_biases, use_muon=False,
+                 lr=new_hyperparams[2], betas=(1-new_hyperparams[3], 1-new_hyperparams[4]), weight_decay=new_hyperparams[5]),
+            dict(params=nonhidden_params, use_muon=False,
+                 lr=new_hyperparams[6], betas=(1-new_hyperparams[7], 1-new_hyperparams[8]), weight_decay=new_hyperparams[9])
+        ]
+        optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+
         net.train()
+        correct_positive = 0
         #batch = 0
-        for data_input, result in train_data_loader:
+        for sub_epoch in range(5):
             
-            #batch += 1
-            #if batch % 100 == 0:
-                #print("batch:",batch, "reached")
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            result_loss = loss(prediction,result.view(-1))
-            result_loss.backward()
-            
-            optimizer.step()
-            optimizer.zero_grad()
+            for data_input, result in train_data_loader:
+                
+                #batch += 1
+                #if batch % 100 == 0:
+                    #print("batch:",batch, "reached")
+                result = result.to("cuda",non_blocking = True)
+                prediction = net(data_input.to("cuda",non_blocking = True))
+                result_loss = loss(prediction,result.view(-1))
+                result_loss.backward()
+                
+                optimizer.step()
+                optimizer.zero_grad()
             
             
             
             #print(result_loss)
         
-        net.eval()
-        correct = 0
-        with torch.no_grad():
-            for data_input, result in val_data_loader:
+            net.eval()
+            with torch.no_grad():
+                for data_input, result in val_data_loader:
+                    result = result.to("cuda",non_blocking = True)
+                    prediction = net(data_input.to("cuda",non_blocking = True))
+                    correct_positive += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
+        
+        
+        
+        new_hyperparams = hyperparams - hyperparam_update
+        net = SqueezeAttention(3, 5).to("cuda")
+        hidden_weights = [p for p in net.parameters() if p.ndim >= 2][:-1]
+        hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
+        nonhidden_params = [net.results.weight]
+        param_groups = [
+            dict(params=hidden_weights, use_muon=True,
+                 lr=new_hyperparams[0], weight_decay=new_hyperparams[1]),
+            dict(params=hidden_gains_biases, use_muon=False,
+                 lr=new_hyperparams[2], betas=(1-new_hyperparams[3], 1-new_hyperparams[4]), weight_decay=new_hyperparams[5]),
+            dict(params=nonhidden_params, use_muon=False,
+                 lr=new_hyperparams[6], betas=(1-new_hyperparams[7], 1-new_hyperparams[8]), weight_decay=new_hyperparams[9])
+        ]
+        optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+        
+        net.train()
+        correct_negative = 0
+        #batch = 0
+        for sub_epoch in range(5):
+            
+            for data_input, result in train_data_loader:
+                
+                #batch += 1
+                #if batch % 100 == 0:
+                    #print("batch:",batch, "reached")
                 result = result.to("cuda",non_blocking = True)
                 prediction = net(data_input.to("cuda",non_blocking = True))
-                correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
+                result_loss = loss(prediction,result.view(-1))
+                result_loss.backward()
+                
+                optimizer.step()
+                optimizer.zero_grad()
+            
+            
+            
+            #print(result_loss)
         
-        print("correct:",correct)
-        #Out of 120 for retina.
-        #78 for breast.
-        if correct > best:
-            best = correct
-            print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention50_1.pt")
-
-
-
-#This section is deliberately separate in case we want to just evaluate the model.
-
-test_data = RetinaMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
-test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
-
-if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention50_1.pt") #Let's get up to 10 epochs?
-    net.load_state_dict(pretrained)
-
-
-    correct = 0
-    total = 400 
+            net.eval()
+            with torch.no_grad():
+                for data_input, result in val_data_loader:
+                    result = result.to("cuda",non_blocking = True)
+                    prediction = net(data_input.to("cuda",non_blocking = True))
+                    correct_negative += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
         
-    net.eval()
-    with torch.no_grad():
         
-        for data_input, result in test_data_loader:
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
-    
-    print("accuracy: ",correct / total)
-
-#torch.save(net.state_dict(),"SEnet_breast.pt")
-
-#Baseline: 
-#Breast mnist: 0.896
-#Retina mnist: 0.561 
-
-#This one:
-#Breast mnist: 0.7179
-#Smaller version: 0.7308
-# 90k parameters only! 
-#Change to (8,64)
-# about 1m parameters.
-#0.7692
-
-#Add up_projection. 
-#0.8333
-# only about 2m parameters.
-#Larger model doesn't seem to help. (About 3m params.)
-#0.8333
-#On the second thought... After some more training, the 3m params beat the 2m params version.
-#0.8590
-
-#On the other hand, it is very compute-heavy. This one took 102.3(G) MACS compared to 4.14(G) in resnet50.
-
-#V3 doesn't look so good on the first attempt. 0.7949
-#Try bringing back the max pool. 
-#0.8077
-
-#Reverting to the original idea. Now, try Retina mnist.
-
-#0.5300
-#This one is Retina_squeezeattention_1_1
-
-#Breast mnist with more params:
-#0.8205
-
-#8 heads.
-#0.7436 Horrible result.
-
-#Reverting again. Now, try betas = (0.8,0.96)
-#0.7692 Not working.
-
-#The previous evaluations were noisy because I forgot to set the net in eval mode.
-
-#The best model so far got this. 
-#0.8654 (Breast_SqueezeAttention4_2)
-
-#With the adjusted betas... 0.7756 Not working.
-
-#Try the version with the correct evaluation (20 epochs): 0.8526
-#(Breast_SqueezeAttention10_1)
-
-#Try a second round to push the number higher. (Not trained to completion.)
-
-# 0.8718
-#Retina mnist:
-#0.5375
-#Retina_SqueezeAttention2_1
-
-#Now, version 3. Let's change to Gelu.
-#0.5700
-
-#Let's try breastMNIST with it.
-#0.8205 (Not so good yet.)
-#Final result: 0.8526
-
-#Version 12. Let's see if it was a fluke.
-#0.8205
-#With actual training, silu: 
-#0.8718
-#Retina mnist:
-#0.565'
-
-#With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
-# 0.6175. SOTA!
-# With 5 epochs: 0.595
-# With another 5 epochs: 0.6075
-# Trying 10 epochs with a different seed: 
-# 0.625 (Yay!) (Retina_SqueezeAttention7_1)
-
-# Without color jitter: 0.5325
-
-# With dropout reduced to 0.25: 0.6275 (Yay!)
-
-#Oops, accidentally overwrote squeezeattention9_1: With only 0.1 jitter: 0.62
-
-# With jitter = 0.3, horrible. (0.525)
-
-#Delete squeezeattention_9_1 and try 0.15 color jitter.
-
-#0.6425! Yay! *(Squeezeattention9_1) Also checkpoint 5
-
-#With head = 8: 0.6175 (v10)
-
-#Now, update to v11 and try head=8 for the last 2 resolutions only: 0.5825
-
-#Try another seed with 20 epochs: 0.5975
-#So, if not that lucky, could be worse.
-
-#With another seed, 25 epochs: 
-# 0.615
-
-#Version 15: More layers!
-# 0.6075
-
-#Version 17: 0.6025
-
-#Try again (20 epochs): 0.545
+        hyperparams += hyperparam_update*(0.2*np.clip((correct_positive-correct_negative)/5,-5.0,5.0))
+        
+        print("positive:", correct_positive/5)
+        print("negative:", correct_negative/5)
+        
+        print([float(i) for i in hyperparams])
+            
+            
 
 
-#Heard you like param tunes? 0.5975 with weight decay = 0.02. Wait... wrong... that was lr=0.02
-# The best one is with lr = 0.01 and 1.5e-4. (Version 19), 0.655
-
-#With lr = 0.02 on both: 0.6425
-
-#Version 22: with changed betas to (0.9, 0.95): 0.655
-
-#Version 23: 0.62
-
-#Version 24: 0.6025
-
-#Version 25: 0.595
-
-#Version 33: 0.585
-
-#Version 35: 0.575
-
-#Version 37: 0.585
-
-#Version 38: 0.5975
-
-#Version 39: 0.58
-
-#Version 41: 0.585
-
-#Version 42: 0.6125 (Add extra block)
-
-#Version 43: 0.6525
-
-#Version 44: 0.6275
-
-#Version 45: 0.6475
-
-#Version 46: 0.6
-
-#Version 47: 0.62
-
-#Version 48: 0.6225
-
-#Version 49: 0.6425
-
-#Version 50: 0.63

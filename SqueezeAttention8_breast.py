@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(3768749723)
+torch.manual_seed(3768749766)
 
 torch.set_float32_matmul_precision("high")
 
@@ -231,11 +231,24 @@ net = SqueezeAttention(1, 2).to("cuda")
 hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.intro.weight, net.results.weight]
+"""
 hyperparams = [0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763,
                0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
                2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 0.07000432048238599]
 
 
+
+hyperparams = [0.0022443332150382162, 0.005144466831288332, 3.233003581006977e-05,
+                        0.04954685101372992, 0.01419429600788806, 0.0017545040377340594,
+                        1.423908427033411e-05, 0.3231503419580622, 0.0024723986019527834,
+                        0.03852306426142474]
+
+
+hyperparams = [0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
+ 0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944]
+"""
+
+hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=hyperparams[0], weight_decay=hyperparams[1]),
@@ -302,14 +315,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention45_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention48_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention45_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention48_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -480,4 +493,10 @@ if __name__ == "__main__":
 
 #With weight decay = (0.01, 0.001): 0.8910
 
-#New one: 0.8974
+#New one: 0.8974 (version 45)
+
+#New one: 0.8526 (version 46)
+
+#Version 47: 0.8846153846153846
+
+#Version 48: 0.8397435897435898
