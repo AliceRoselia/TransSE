@@ -350,58 +350,6 @@ if __name__ == "__main__":
     
     print("accuracy: ",correct / total)
 
-#torch.save(net.state_dict(),"SEnet_breast.pt")
-
-#Baseline: 
-#Breast mnist: 0.896
-#Retina mnist: 0.561 
-
-#This one:
-#Breast mnist: 0.7179
-#Smaller version: 0.7308
-# 90k parameters only! 
-#Change to (8,64)
-# about 1m parameters.
-#0.7692
-
-#Add up_projection. 
-#0.8333
-# only about 2m parameters.
-#Larger model doesn't seem to help. (About 3m params.)
-#0.8333
-#On the second thought... After some more training, the 3m params beat the 2m params version.
-#0.8590
-
-#On the other hand, it is very compute-heavy. This one took 102.3(G) MACS compared to 4.14(G) in resnet50.
-
-#V3 doesn't look so good on the first attempt. 0.7949
-#Try bringing back the max pool. 
-#0.8077
-
-#Reverting to the original idea. Now, try Retina mnist.
-
-#0.5300
-#This one is Retina_squeezeattention_1_1
-
-#Breast mnist with more params:
-#0.8205
-
-#8 heads.
-#0.7436 Horrible result.
-
-#Reverting again. Now, try betas = (0.8,0.96)
-#0.7692 Not working.
-
-#The previous evaluations were noisy because I forgot to set the net in eval mode.
-
-#The best model so far got this. 
-#0.8654 (Breast_SqueezeAttention4_2)
-
-#With the adjusted betas... 0.7756 Not working.
-
-#Try the version with the correct evaluation (20 epochs): 0.8526
-#(Breast_SqueezeAttention10_1)
-
 #Try a second round to push the number higher. (Not trained to completion.)
 
 # 0.8718

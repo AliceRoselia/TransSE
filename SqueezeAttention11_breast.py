@@ -344,7 +344,6 @@ if __name__ == "__main__":
 
 #Baseline: 
 #Breast mnist: 0.896
-#Retina mnist: 0.561 
 
 #This one:
 #Breast mnist: 0.7179
@@ -368,11 +367,6 @@ if __name__ == "__main__":
 #Try bringing back the max pool. 
 #0.8077
 
-#Reverting to the original idea. Now, try Retina mnist.
-
-#0.5300
-#This one is Retina_squeezeattention_1_1
-
 #Breast mnist with more params:
 #0.8205
 
@@ -395,52 +389,6 @@ if __name__ == "__main__":
 #Try a second round to push the number higher. (Not trained to completion.)
 
 # 0.8718
-#Retina mnist:
-#0.5375
-#Retina_SqueezeAttention2_1
-
-#Now, version 3. Let's change to Gelu.
-#0.5700
-
-#Let's try breastMNIST with it.
-#0.8205 (Not so good yet.)
-#Final result: 0.8526
-
-#Version 12. Let's see if it was a fluke.
-#0.8205
-#With actual training, silu: 
-#0.8718
-#Retina mnist:
-#0.565'
-
-#With Muon optimizer: (stopped before 10 epochs during the 8th epochs using the result from the 5th epoch.)
-# 0.6175. SOTA!
-# With 5 epochs: 0.595
-# With another 5 epochs: 0.6075
-# Trying 10 epochs with a different seed: 
-# 0.625 (Yay!) (Retina_SqueezeAttention7_1)
-
-# Without color jitter: 0.5325
-
-# With dropout reduced to 0.25: 0.6275 (Yay!)
-
-#Oops, accidentally overwrote squeezeattention9_1: With only 0.1 jitter: 0.62
-
-# With jitter = 0.3, horrible. (0.525)
-
-#Delete squeezeattention_9_1 and try 0.15 color jitter.
-
-#0.6425! Yay! *(Squeezeattention9_1) Also checkpoint 5
-
-#With head = 8: 0.6175 (v10)
-
-#Now, update to v11 and try head=8 for the last 2 resolutions only: 0.5825
-
-#Try another seed with 20 epochs: 0.5975
-#So, if not that lucky, could be worse.
-
-#With another seed, 25 epochs: 
-# 0.615
 
 #Breast mnist: 0.814
 
