@@ -315,3 +315,7 @@ if __name__ == "__main__":
 #Derma mnist 3 (With a few more layers): 0.745
 
 #Derma mnist 5 (with weight decay): 0.7406
+
+#Derma mnist 6 (100 epochs): 0.8040 
+
+#Operation count: 69 Gigaops. 16m params. 20 ms.
