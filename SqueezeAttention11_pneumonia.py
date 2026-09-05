@@ -37,7 +37,7 @@ torch.set_float32_matmul_precision("high")
     
 batch_size = 2
 num_workers = 4
-prefetch_factor = 8 
+prefetch_factor = 40 
 
 train_data = PneumoniaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),

@@ -73,18 +73,9 @@ class SqueezeAttentionBlock(nn.Module):
     
     def __init__(self,m,n, head = 4):
         super(SqueezeAttentionBlock,self).__init__()
-        assert n%head == 0
-        self.channel_group_count = m
-        self.qk = nn.Linear(n,2*n)
-        self.heads = head
-        self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
         self.conv = nn.Conv2d(n, n, 3, padding = "same")
-        #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
-        self.head_size = n//head
-        scale = torch.full((head,m,m),self.head_size ** -0.5)
-        self.register_buffer("scale", scale) #Pre-broadcast
     
     #@torch.compile()
     def fused_conv_activation(self,x):
@@ -98,17 +89,17 @@ class SqueezeAttentionBlock(nn.Module):
     def forward(self,x):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
-        channel_reps = x.mean((3,4)) #dimension: B,M,N
+        #channel_reps = x.mean((3,4)) #dimension: B,M,N
         
         
-        query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
-        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
+        #query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
+        #value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
         
-        scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
+        #scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
         
-        attn = func.softmax(scores,dim=-1)
+        #attn = func.softmax(scores,dim=-1)
         
-        attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
+        #attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
         
         #TODO: add local gate.
         #print(self.scale.device)
@@ -122,13 +113,13 @@ class SqueezeAttentionBlock(nn.Module):
         
        #with sdpa_kernel(backends=[SDPBackend.MATH]):
             #attention_result = func.scaled_dot_product_attention(query,key,value).view(B,M,N,H,W)
-        attention_result = attention_result.reshape(B,M,N,H,W) + x
-        attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
+        #attention_result = attention_result.reshape(B,M,N,H,W) + x
+        result = self.bn1(x.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
         
-        attention_result = self.bn2(self.fused_conv_activation(attention_result).view(B,M*N,H,W))
+        result = self.bn2(self.fused_conv_activation(result).view(B,M*N,H,W))
         
         
-        return attention_result.view(B,M,N,H,W)
+        return result.view(B,M,N,H,W)
 
 class UpProjection(nn.Module):
     def __init__(self,n,n2):
@@ -275,7 +266,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 100
+max_epoch = 25
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -320,7 +311,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention50_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention_ablation_1.pt")
 
 
 
@@ -331,7 +322,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention50_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention_ablation_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
