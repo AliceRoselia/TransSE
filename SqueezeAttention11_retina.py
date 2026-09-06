@@ -21,7 +21,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(21111362)
+torch.manual_seed(71909099)
 
 torch.set_float32_matmul_precision("high")
 
@@ -170,6 +170,7 @@ class SqueezeAttention(nn.Module):
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
         
+        
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
@@ -199,6 +200,8 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
+        x = self.squeeze_to_pool(x) #14
+        #x = self.squeeze_to_pool(x) #14
         
         
         
@@ -229,7 +232,17 @@ hyperparams = [0.0011726408837611168, 0.010916422693267544, 0.000120829524364377
 """
 
 #hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
-hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
+#The retina tune might've gone wrong.
+
+"""
+#Maybe revert to this.
+hyperparams = [1.00663457e-03, 1.00120680e-02, 1.12677415e-04, 1.02503806e-01,
+ 1.31625708e-02, 8.86276568e-03, 5.03050078e-05, 1.09865157e-01,
+ 9.68306067e-03, 1.08889997e-01]
+"""
+
+hyperparams = [0.0008602522078379203, 0.012369705667362903, 9.752763156138204e-05, 0.0655110378721131, 0.013811079331863048, 0.010340056669188179, 1.9917593041199128e-05, 0.1769209451676188, 0.007003697900328614, 0.056487999850367676]
+
 
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
@@ -259,7 +272,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 100
+max_epoch = 50
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -304,7 +317,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention50_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention52_1.pt")
 
 
 
@@ -315,7 +328,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention50_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention52_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -432,3 +445,5 @@ if __name__ == "__main__":
 #Version 49: 0.6425
 
 #Version 50: 0.63
+
+#Version 51 (25 epochs): 0.62
