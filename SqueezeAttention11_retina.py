@@ -447,3 +447,5 @@ if __name__ == "__main__":
 #Version 50: 0.63
 
 #Version 51 (25 epochs): 0.62
+
+#Version 52: With the same tuned parameters: 0.6425

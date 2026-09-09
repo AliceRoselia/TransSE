@@ -20,7 +20,7 @@ torch._dynamo.config.accumulated_cache_size_limit = 128
 
 #from torch.nn.attention import SDPBackend, sdpa_kernel
 
-torch.manual_seed(71203674)
+torch.manual_seed(71909099)
 
 torch.set_float32_matmul_precision("high")
 
@@ -37,7 +37,7 @@ torch.set_float32_matmul_precision("high")
     
 batch_size = 2
 num_workers = 4
-prefetch_factor = 40 
+prefetch_factor = 4
 
 train_data = DermaMNIST(split="train",transform = transforms.Compose([
     transforms.ToTensor(),

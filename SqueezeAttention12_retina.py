@@ -73,13 +73,23 @@ class SqueezeAttentionBlock(nn.Module):
     
     def __init__(self,m,n, head = 4):
         super(SqueezeAttentionBlock,self).__init__()
+        assert n%head == 0
+        self.channel_group_count = m
+        self.qk = nn.Linear(n,2*n)
+        self.heads = head
+        self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
-        self.conv = nn.Conv2d(n, n, 3, padding = "same")
+        self.depthwise_conv = nn.Conv2d(n, n, 3, padding = "same",groups=n)
+        self.pointwise_conv = nn.Conv2d(n, n, 1)
+        #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
+        self.head_size = n//head
+        scale = torch.full((head,m,m),self.head_size ** -0.5)
+        self.register_buffer("scale", scale) #Pre-broadcast
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.silu(self.conv(x))
+        return x + func.silu(self.pointwise_conv(func.silu(self.depthwise_conv(x))))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
@@ -89,17 +99,17 @@ class SqueezeAttentionBlock(nn.Module):
     def forward(self,x):
         # X is of shape [B,M,N,H,W]
         B,M,N,H,W = x.shape
-        #channel_reps = x.mean((3,4)) #dimension: B,M,N
+        channel_reps = x.mean((3,4)) #dimension: B,M,N
         
         
-        #query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
-        #value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
+        query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
+        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
         
-        #scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
+        scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
         
-        #attn = func.softmax(scores,dim=-1)
+        attn = func.softmax(scores,dim=-1)
         
-        #attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
+        attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
         
         #TODO: add local gate.
         #print(self.scale.device)
@@ -113,13 +123,13 @@ class SqueezeAttentionBlock(nn.Module):
         
        #with sdpa_kernel(backends=[SDPBackend.MATH]):
             #attention_result = func.scaled_dot_product_attention(query,key,value).view(B,M,N,H,W)
-        #attention_result = attention_result.reshape(B,M,N,H,W) + x
-        result = self.bn1(x.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
+        attention_result = attention_result.reshape(B,M,N,H,W) + x
+        attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
         
-        result = self.bn2(self.fused_conv_activation(result).view(B,M*N,H,W))
+        attention_result = self.bn2(self.fused_conv_activation(attention_result).view(B,M*N,H,W))
         
         
-        return result.view(B,M,N,H,W)
+        return attention_result.view(B,M,N,H,W)
 
 class UpProjection(nn.Module):
     def __init__(self,n,n2):
@@ -161,6 +171,7 @@ class SqueezeAttention(nn.Module):
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
         
+        
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
@@ -190,6 +201,8 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
+        x = self.squeeze_to_pool(x) #14
+        #x = self.squeeze_to_pool(x) #14
         
         
         
@@ -220,7 +233,17 @@ hyperparams = [0.0011726408837611168, 0.010916422693267544, 0.000120829524364377
 """
 
 #hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
+#The retina tune might've gone wrong.
+
+"""
+#Maybe revert to this.
+hyperparams = [1.00663457e-03, 1.00120680e-02, 1.12677415e-04, 1.02503806e-01,
+ 1.31625708e-02, 8.86276568e-03, 5.03050078e-05, 1.09865157e-01,
+ 9.68306067e-03, 1.08889997e-01]
+"""
+
 hyperparams = [0.0008602522078379203, 0.012369705667362903, 9.752763156138204e-05, 0.0655110378721131, 0.013811079331863048, 0.010340056669188179, 1.9917593041199128e-05, 0.1769209451676188, 0.007003697900328614, 0.056487999850367676]
+
 
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
@@ -250,7 +273,7 @@ best = 0
 #pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
 #net.load_state_dict(pretrained)
 
-max_epoch = 50
+max_epoch = 100
 #muon_max = 0.001
 #muon_min = 0.0005
 # We need around 0.0009?
@@ -295,7 +318,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention_ablation_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention53_1.pt")
 
 
 
@@ -306,7 +329,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention_ablation_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention53_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -424,6 +447,8 @@ if __name__ == "__main__":
 
 #Version 50: 0.63
 
-#Ablation looks good but doesn't work well. 0.615
+#Version 51 (25 epochs): 0.62
 
-#Ablation round 2:  0.575
+#Version 52: With the same tuned parameters: 0.6425
+
+#Version 53: With depthwise-separable convs: 0.65
