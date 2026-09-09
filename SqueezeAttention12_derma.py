@@ -325,4 +325,4 @@ if __name__ == "__main__":
 
 #Derma mnist 7 (100 epochs): 0.7995 (But depthwise separable is cheaper.)
 
-#(Approximately) 27.2 Gops, 1.2m params.
+#(Approximately) 34.335 Gops, 5.641m params.
