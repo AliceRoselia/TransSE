@@ -232,9 +232,6 @@ net = SqueezeAttention(1, 2).to("cuda")
 #Muon with new adjustment algorithm. No weight decay because only 3m parameters.
 
 hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
-depthwise_weights = [p for p in hidden_weights if p.shape[1] == 1]
-pointwise_weights = [p for p in hidden_weights if p.shape[1] > 1]
-del hidden_weights
 
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.intro.weight, net.results.weight]
@@ -258,9 +255,9 @@ hyperparams = [0.0010889095024196832,0.009942881373920073,0.00012181194634217088
 #hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
 hyperparams = [0.0008602522078379203, 0.012369705667362903, 9.752763156138204e-05, 0.0655110378721131, 0.013811079331863048, 0.010340056669188179, 1.9917593041199128e-05, 0.1769209451676188, 0.007003697900328614, 0.056487999850367676]
 param_groups = [
-    dict(params=pointwise_weights, use_muon=True,
+    dict(params=hidden_weights, use_muon=True,
          lr=hyperparams[0], weight_decay=hyperparams[1]),
-    dict(params=hidden_gains_biases+depthwise_weights, use_muon=False,
+    dict(params=hidden_gains_biases, use_muon=False,
          lr=hyperparams[2], betas=(1-hyperparams[3], 1-hyperparams[4]), weight_decay=hyperparams[5]),
     dict(params=nonhidden_params, use_muon=False,
          lr=hyperparams[6], betas=(1-hyperparams[7], 1-hyperparams[8]), weight_decay=hyperparams[9])
