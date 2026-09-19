@@ -163,18 +163,22 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
+        self.SAB13 = SqueezeAttentionBlock(8, 512)
+        self.SAB14 = SqueezeAttentionBlock(8, 512)
+        self.SAB15 = SqueezeAttentionBlock(8, 512)
+        self.SAB16 = SqueezeAttentionBlock(8, 512)
+        
         
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        
-        self.OUTPUT_SHAPE = ResultShape()
+        self.UP4 = UpProjection(256, 512)
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(2048, classes)
-    #@torch.compile() We will not need to compile for small-scale test.
+        self.results = nn.Linear(4096, classes)
+    @torch.compile()
     def forward(self,x):
         B,C,H,W = x.shape
         x = self.intro(x).view(B,8,32,H,W)
@@ -197,7 +201,12 @@ class SqueezeAttention(nn.Module):
         x = self.SAB11(x)
         x = self.SAB12(x)
         x = self.squeeze_to_pool(x) #14
-        #x = self.squeeze_to_pool(x) #14
+        x = self.UP4(x)
+        x = self.SAB13(x)
+        x = self.SAB14(x)
+        x = self.SAB15(x)
+        x = self.SAB16(x)
+        
         x = self.OUTPUT_SHAPE(x)
         
         

@@ -204,7 +204,6 @@ class SqueezeAttention(nn.Module):
         x = self.SAB14(x)
         x = self.SAB15(x)
         x = self.SAB16(x)
-        #x = self.squeeze_to_pool(x) #14
         
         
         
