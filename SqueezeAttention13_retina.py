@@ -201,8 +201,7 @@ class SqueezeAttention(nn.Module):
         x = self.SAB10(x)
         x = self.SAB11(x)
         x = self.SAB12(x)
-        #x = self.squeeze_to_pool(x) #14
-        #x = self.squeeze_to_pool(x) #14
+        x = self.squeeze_to_pool(x) #14
         
         
         
@@ -318,7 +317,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention55_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention56_1.pt")
 
 
 
@@ -329,7 +328,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention55_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention56_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -454,3 +453,5 @@ if __name__ == "__main__":
 #Version 53: With depthwise-separable convs: 0.65
 
 #Version 54: 5x5: 0.6
+
+#Version 55: 0.6175 (It seems the downscaling was important.)

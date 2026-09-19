@@ -16,6 +16,7 @@ import torch.utils.data as data
 from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
+import matplotlib.pyplot as plt
 #We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
 torch._dynamo.config.recompile_limit = 128
 torch._dynamo.config.cache_size_limit = 128 
@@ -161,6 +162,8 @@ class SqueezeAttention(nn.Module):
         self.SAB15 = SqueezeAttentionBlock(8, 512)
         self.SAB16 = SqueezeAttentionBlock(8, 512)
         
+        self.OUTPUT_SHAPE = ResultShape()
+        
         
         
         self.UP1 = UpProjection(32, 64)
@@ -171,7 +174,7 @@ class SqueezeAttention(nn.Module):
         self.dropout = nn.Dropout(0.25)
         
         self.results = nn.Linear(4096, classes)
-    @torch.compile()
+    #@torch.compile()
     def forward(self,x):
         B,C,H,W = x.shape
         x = self.intro(x).view(B,8,32,H,W)
@@ -204,7 +207,7 @@ class SqueezeAttention(nn.Module):
         
         
         
-        x = self.dropout(x.mean((2,3)).view(-1,2048))
+        x = self.dropout(x.mean((2,3)).view(-1,4096))
         
         return self.results(x)
         
