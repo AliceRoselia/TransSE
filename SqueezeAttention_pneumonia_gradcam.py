@@ -1,0 +1,261 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Apr 11 20:42:47 2026
+
+@author: User
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as func
+
+from medmnist import PneumoniaMNIST
+import torchvision.transforms as transforms
+import torch.utils.data as data
+
+from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
+#We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
+torch._dynamo.config.recompile_limit = 128
+torch._dynamo.config.cache_size_limit = 128 
+torch._dynamo.config.accumulated_cache_size_limit = 128
+
+#from torch.nn.attention import SDPBackend, sdpa_kernel
+
+torch.manual_seed(71909099)
+
+torch.set_float32_matmul_precision("high")
+
+
+#TransSEnet for medical imaging and similar tasks.
+
+
+    
+
+        
+#https://pytorch.org/blog/flexattention-flashattention-4-fast-and-flexible/ in case you need 
+#a flexible attention.
+
+    
+batch_size = 1
+num_workers = 4
+prefetch_factor = 4
+
+train_data = PneumoniaMNIST(split="train",transform = transforms.ToTensor(),
+    download=True,size = 224)
+train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
+pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
+
+
+#Use torch.nn.functional.scaled_dot_product_attention
+
+class SqueezeAttentionBlock(nn.Module):
+    
+    def __init__(self,m,n, head = 4):
+        super(SqueezeAttentionBlock,self).__init__()
+        assert n%head == 0
+        self.channel_group_count = m
+        self.qk = nn.Linear(n,2*n)
+        self.heads = head
+        self.value_conv = nn.Conv2d(n, n, 1)
+        self.bn1 = nn.BatchNorm2d(m*n)
+        self.depthwise_conv = nn.Conv2d(n, n, 3, padding = "same",groups=n)
+        self.pointwise_conv = nn.Conv2d(n, n, 1)
+        #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
+        self.bn2 = nn.BatchNorm2d(m*n)
+        self.head_size = n//head
+        scale = torch.full((head,m,m),self.head_size ** -0.5)
+        self.register_buffer("scale", scale) #Pre-broadcast
+    
+    #@torch.compile()
+    def fused_conv_activation(self,x):
+        return x + func.silu(self.pointwise_conv(func.silu(self.depthwise_conv(x))))
+    
+    #def convs(self,x):
+        #return self.pw_conv(self.dw_conv(x))
+    
+    
+    #@torch.compile()
+    def forward(self,x):
+        # X is of shape [B,M,N,H,W]
+        B,M,N,H,W = x.shape
+        channel_reps = x.mean((3,4)) #dimension: B,M,N
+        
+        
+        query, key = self.qk(channel_reps).view(B,M,self.heads,N*2//self.heads).transpose(1,2).chunk(2,dim=3) #Dimensions B,Head,M,N/Head 
+        value = self.value_conv(x.view(B*M,N,H,W)).view(B,M,self.heads,self.head_size,H,W).transpose(1,2) #Dimensions: B,Head,M,N/Head,H,W
+        
+        scores = torch.matmul(query, key.transpose(-2, -1)) * self.scale #Dimensions B, Head, M, M
+        
+        attn = func.softmax(scores,dim=-1)
+        
+        attention_result = torch.einsum('baij,bajchw -> baichw', attn, value).transpose(1,2)
+        
+        #TODO: add local gate.
+        #print(self.scale.device)
+        
+        
+        #attention_result = self.attention_kernel(query,key,value,self.scale)
+    
+        
+        
+        #Manual attention result because optimized kernels weren't optimized for this.
+        
+       #with sdpa_kernel(backends=[SDPBackend.MATH]):
+            #attention_result = func.scaled_dot_product_attention(query,key,value).view(B,M,N,H,W)
+        attention_result = attention_result.reshape(B,M,N,H,W) + x
+        attention_result = self.bn1(attention_result.view(B,M*N,H,W)).view(B*M,N,H,W) #Dimensions: B*M,N,H,W
+        
+        attention_result = self.bn2(self.fused_conv_activation(attention_result).view(B,M*N,H,W))
+        
+        
+        return attention_result.view(B,M,N,H,W)
+
+class UpProjection(nn.Module):
+    def __init__(self,n,n2):
+        super(UpProjection,self).__init__()
+        self.conv = nn.Conv2d(n, n2, 1, padding = "same")
+        assert n2 == 2*n
+    #@torch.compile()
+    def forward(self,x):
+        B,M,N,H,W = x.shape
+        return self.conv(x.view(B*M,N,H,W)).view(B,M,N*2,H,W)
+
+class ResultShape(nn.Module):
+    def __init__(self):
+        super(ResultShape,self).__init__()
+    def forward(self,x):
+        B,M,N,H,W = x.shape
+        return x.reshape(B,M*N,H,W)
+        
+class SqueezeAttention(nn.Module):
+    #@torch.compile()
+    def squeeze_to_pool(self,x):
+        B,M,N,H,W = x.shape
+        return func.max_pool2d(x.view(B*M,N,H,W), 2).view(B,M,N,H//2,W//2)
+    #USE max pooling. Strided convolution was tried and did NOT help.
+
+    
+    def __init__(self,in_channels,classes):
+        super(SqueezeAttention,self).__init__()
+        self.intro = nn.Conv2d(in_channels,256,kernel_size=7,padding="same")
+        self.SAB1 = SqueezeAttentionBlock(8, 32)
+        self.SAB2 = SqueezeAttentionBlock(8, 32)
+        self.SAB3 = SqueezeAttentionBlock(8, 32)
+        
+        self.SAB4 = SqueezeAttentionBlock(8, 64)
+        self.SAB5 = SqueezeAttentionBlock(8, 64)
+        self.SAB6 = SqueezeAttentionBlock(8, 64)
+        
+        self.SAB7 = SqueezeAttentionBlock(8, 128)
+        self.SAB8 = SqueezeAttentionBlock(8, 128)
+        self.SAB9 = SqueezeAttentionBlock(8, 128)
+        
+        self.SAB10 = SqueezeAttentionBlock(8, 256)
+        self.SAB11 = SqueezeAttentionBlock(8, 256)
+        self.SAB12 = SqueezeAttentionBlock(8, 256)
+        
+        
+        
+        self.UP1 = UpProjection(32, 64)
+        self.UP2 = UpProjection(64, 128)
+        self.UP3 = UpProjection(128, 256)
+        
+        self.OUTPUT_SHAPE = ResultShape()
+        
+        self.dropout = nn.Dropout(0.25)
+        
+        self.results = nn.Linear(2048, classes)
+    #@torch.compile() We will not need to compile for small-scale test.
+    def forward(self,x):
+        B,C,H,W = x.shape
+        x = self.intro(x).view(B,8,32,H,W)
+        x = self.SAB1(x)
+        x = self.SAB2(x)
+        x = self.SAB3(x)
+        x = self.squeeze_to_pool(x) #112
+        x = self.UP1(x)
+        x = self.SAB4(x)
+        x = self.SAB5(x)
+        x = self.SAB6(x)
+        x = self.squeeze_to_pool(x) #56
+        x = self.UP2(x)
+        x = self.SAB7(x)
+        x = self.SAB8(x)
+        x = self.SAB9(x)
+        x = self.squeeze_to_pool(x) #28
+        x = self.UP3(x)
+        x = self.SAB10(x)
+        x = self.SAB11(x)
+        x = self.SAB12(x)
+        x = self.squeeze_to_pool(x) #14
+        #x = self.squeeze_to_pool(x) #14
+        x = self.OUTPUT_SHAPE(x)
+        
+        
+        
+        x = self.dropout(x.mean((2,3)).view(-1,2048))
+        
+        return self.results(x)
+        
+        
+        
+
+
+
+net = SqueezeAttention(1, 2).to("cuda")
+
+def gradcam_plot(model, data_loader, limit = 10):
+    print("Okay")
+    count = 0
+    #targets = [ClassifierOutputTarget(2)]
+    with GradCAM(model = model, target_layers = [model.OUTPUT_SHAPE]) as cam:
+        for data_input, result in data_loader:
+            #print(data_input.shape)
+            cam_result = cam(input_tensor=data_input,targets = None)
+            cam_result = cam_result[0,:]
+            cam_image = show_cam_on_image(data_input[0].cpu().numpy().transpose(1,2,0), cam_result, use_rgb=True)
+            
+            plt.imshow(cam_image)
+            plt.show()
+            count += 1
+            if count >= limit:
+                break
+
+if __name__ == "__main__":
+    pretrained = torch.load("Pneumonia_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
+    net.load_state_dict(pretrained)
+
+
+    correct = 0
+    total = 624 
+        
+    net.eval()
+        
+    gradcam_plot(net, train_data_loader)
+
+
+
+#Trying pneumonia mnist: 0.8558
+
+#Attempt 2 without the squeeze at the end: 0.867
+
+#Attempt 3 (more layers): 0.8638
+
+#Attempt 4 (normalize): 0.8798: YAY!
+
+#Attempt 5 (hyperparam tune): 0.8846 YAY!
+
+#Attempt 7 (100 epochs, but actually, 50 is more than enough): 0.9087 YAY!
+
+#Attempt 8 (100 epochs, stopped at exactly 50): 0.9103
+
+#Attempt 9 (100 epochs, 5x5 conv): 0.8878
+
+#Attempt 10 (100 epochs, 5x5 convs, heavy augmentation): 0.9022
+
+#Attempt 11 (100 epochs, 3x3 convs, heavier augmentation): 0.9087
+
+#Attempt 12 (100 epochs with even heavier augmentations
+#(brightness=1.0, contrast=0.5, saturation=0.2)): 0.9182. YAY!

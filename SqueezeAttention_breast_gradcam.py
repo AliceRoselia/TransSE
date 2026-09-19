@@ -12,7 +12,10 @@ import torch.nn.functional as func
 from medmnist import BreastMNIST
 import torchvision.transforms as transforms
 import torch.utils.data as data
-from muon import SingleDeviceMuonWithAuxAdam
+
+from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
 #We still can't use Pytorch native implementation because it lacks suppport for 4d conv params, so we will use Keller's version.
 torch._dynamo.config.recompile_limit = 128
 torch._dynamo.config.cache_size_limit = 128 
@@ -46,22 +49,9 @@ batch_size = 2
 num_workers = 4
 prefetch_factor = 4
 
-train_data = BreastMNIST(split="train",transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(15),
-    transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
-    # Optional: transforms.RandomResizedCrop(224, scale=(0.9,1.0))
-]),download=True,size = 224)
+train_data = BreastMNIST(split="train",transform = transforms.ToTensor(),
+    download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
-
-val_data = BreastMNIST(split="val",transform = transforms.ToTensor(),download=True,size = 224)
-val_data_loader = data.DataLoader(dataset = val_data, batch_size = batch_size,shuffle = True,
-pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
-
-test_data = BreastMNIST(split="test",transform = transforms.ToTensor(),download=True,size = 224)
-test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,shuffle = False,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 
@@ -139,7 +129,12 @@ class UpProjection(nn.Module):
         B,M,N,H,W = x.shape
         return self.conv(x.view(B*M,N,H,W)).view(B,M,N*2,H,W)
 
-        
+class ResultShape(nn.Module):
+    def __init__(self):
+        super(ResultShape,self).__init__()
+    def forward(self,x):
+        B,M,N,H,W = x.shape
+        return x.reshape(B,M*N,H,W)
         
 class SqueezeAttention(nn.Module):
     #@torch.compile()
@@ -168,23 +163,18 @@ class SqueezeAttention(nn.Module):
         self.SAB11 = SqueezeAttentionBlock(8, 256)
         self.SAB12 = SqueezeAttentionBlock(8, 256)
         
-        self.SAB13 = SqueezeAttentionBlock(8, 512)
-        self.SAB14 = SqueezeAttentionBlock(8, 512)
-        self.SAB15 = SqueezeAttentionBlock(8, 512)
-        self.SAB16 = SqueezeAttentionBlock(8, 512)
-        #self.SAB17 = SqueezeAttentionBlock(8, 512)
-        #self.SAB18 = SqueezeAttentionBlock(8, 512)
         
         
         self.UP1 = UpProjection(32, 64)
         self.UP2 = UpProjection(64, 128)
         self.UP3 = UpProjection(128, 256)
-        self.UP4 = UpProjection(256, 512)
+        
+        self.OUTPUT_SHAPE = ResultShape()
         
         self.dropout = nn.Dropout(0.25)
         
-        self.results = nn.Linear(4096, classes)
-    @torch.compile()
+        self.results = nn.Linear(2048, classes)
+    #@torch.compile() We will not need to compile for small-scale test.
     def forward(self,x):
         B,C,H,W = x.shape
         x = self.intro(x).view(B,8,32,H,W)
@@ -207,17 +197,12 @@ class SqueezeAttention(nn.Module):
         x = self.SAB11(x)
         x = self.SAB12(x)
         x = self.squeeze_to_pool(x) #14
-        x = self.UP4(x)
-        x = self.SAB13(x)
-        x = self.SAB14(x)
-        x = self.SAB15(x)
-        x = self.SAB16(x)
-        #x = self.SAB17(x)
-        #x = self.SAB18(x)
+        #x = self.squeeze_to_pool(x) #14
+        x = self.OUTPUT_SHAPE(x)
         
         
         
-        x = self.dropout(x.mean((3,4)).view(-1,4096))
+        x = self.dropout(x.mean((2,3)).view(-1,2048))
         
         return self.results(x)
         
@@ -227,107 +212,31 @@ class SqueezeAttention(nn.Module):
 
 
 net = SqueezeAttention(1, 2).to("cuda")
-#net = torch.compile(net) #Counterproductive. Only compile the bottleneck.
 
-#Muon with new adjustment algorithm. No weight decay because only 3m parameters.
-
-hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
-depthwise_weights = [p for p in hidden_weights if p.shape[1] == 1]
-pointwise_weights = [p for p in hidden_weights if p.shape[1] > 1]
-del hidden_weights
-
-hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
-nonhidden_params = [net.intro.weight, net.results.weight]
-"""
-hyperparams = [0.0011726408837611168, 0.010916422693267544, 0.00012082952436437763,
-               0.09625209551306378, 0.012484844030091051, 0.007170883440335636, 
-               2.918680541912039e-05, 0.1571406473657313, 0.005553990819302258, 0.07000432048238599]
-
-
-
-hyperparams = [0.0022443332150382162, 0.005144466831288332, 3.233003581006977e-05,
-                        0.04954685101372992, 0.01419429600788806, 0.0017545040377340594,
-                        1.423908427033411e-05, 0.3231503419580622, 0.0024723986019527834,
-                        0.03852306426142474]
-
-
-hyperparams = [0.0010889095024196832,0.009942881373920073,0.00012181194634217088,0.09829253245193824,0.012792986806694356,
- 0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944]
-"""
-
-#hyperparams = [0.002215482342290458, 0.005105138289552276, 1.2315904272962708e-05, 0.08801671039700643, 0.008528549554398248, 0.003066647909077181, 1.2325917306245926e-05, 0.17869996096493151, 0.002044691123908544, 0.04567306769116592]
-hyperparams = [0.0008602522078379203, 0.012369705667362903, 9.752763156138204e-05, 0.0655110378721131, 0.013811079331863048, 0.010340056669188179, 1.9917593041199128e-05, 0.1769209451676188, 0.007003697900328614, 0.056487999850367676]
-param_groups = [
-    dict(params=pointwise_weights, use_muon=True,
-         lr=hyperparams[0], weight_decay=hyperparams[1]),
-    dict(params=hidden_gains_biases+depthwise_weights, use_muon=False,
-         lr=hyperparams[2], betas=(1-hyperparams[3], 1-hyperparams[4]), weight_decay=hyperparams[5]),
-    dict(params=nonhidden_params, use_muon=False,
-         lr=hyperparams[6], betas=(1-hyperparams[7], 1-hyperparams[8]), weight_decay=hyperparams[9])
-]
-optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
-
-#optimizer = torch.optim.Muon(net.parameters(),weight_decay = 0.0,lr = 1.5e-4,adjust_lr_fn = "match_rms_adamw")
-loss = nn.CrossEntropyLoss()
-
-#pretrained = torch.load("SEnet.pt")
-
-#del pretrained["layers.0.weight"]
-#del pretrained["layers.0.bias"]
-#del pretrained["results.weight"]
-#del pretrained["results.bias"]
-
-#net.load_state_dict(pretrained,strict=False)
-
-best = 0
-
-#pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
-#net.load_state_dict(pretrained)
-
-max_epoch = 100
-#muon_max = 0.02
-#muon_min = 0.005
-#adam_max = 3e-4
-#adam_min = 7.5e-5
-
-if __name__ == "__main__":
-    for epoch in range(max_epoch):
-        
-        print("Current epoch:",epoch+1)
-        #schedule_LR(optimizer, epoch, max_epoch-1, muon_max, muon_min, adam_max, adam_min)
-        net.train()
-        
-        for data_input, result in train_data_loader:
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            result_loss = loss(prediction,result.view(-1))
-            result_loss.backward()
+def gradcam_plot(model, data_loader, limit = 10):
+    print("Okay")
+    count = 0
+    #targets = [ClassifierOutputTarget(2)]
+    with GradCAM(model = model, target_layers = [model.OUTPUT_SHAPE]) as cam:
+        for data_input, result in data_loader:
+            #print(data_input.shape)
+            cam_result = cam(input_tensor=data_input,targets = None)
+            cam_result = cam_result[0,:]
+            cam_image = show_cam_on_image(data_input[0].cpu().numpy().transpose(1,2,0), cam_result, use_rgb=True)
             
-            optimizer.step()
-            optimizer.zero_grad()
-        
-        net.eval()
-        correct = 0
-        with torch.no_grad():
-            for data_input, result in val_data_loader:
-                result = result.to("cuda",non_blocking = True)
-                prediction = net(data_input.to("cuda",non_blocking = True))
-                correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
-        
-        print("correct:",correct)
-        #Out of 120 for retina.
-        #78 for breast.
-        if correct > best:
-            best = correct
-            print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention57_1.pt")
+            plt.imshow(cam_image)
+            plt.show()
+            count += 1
+            if count >= limit:
+                break
+
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention57_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention55_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -335,14 +244,8 @@ if __name__ == "__main__":
     total = 156 
         
     net.eval()
-    with torch.no_grad():
         
-        for data_input, result in test_data_loader:
-            result = result.to("cuda",non_blocking = True)
-            prediction = net(data_input.to("cuda",non_blocking = True))
-            correct += (prediction.argmax(dim=1) == result.view(-1)).sum().item()
-    
-    print("accuracy: ",correct / total)
+    gradcam_plot(net, train_data_loader)
 
 #torch.save(net.state_dict(),"SEnet_breast.pt")
 

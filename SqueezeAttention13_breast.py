@@ -317,14 +317,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention56_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention58_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention56_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention58_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -466,3 +466,5 @@ if __name__ == "__main__":
 #Version 55: (5x5 depthwise separable): 0.9166666666666666
 
 #Version 56: (7x7): 0.8717948717948718
+
+#Version 57: (Use adam on depthwise): 0.8717948717948718 Rejected.
