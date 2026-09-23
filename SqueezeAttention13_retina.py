@@ -455,3 +455,5 @@ if __name__ == "__main__":
 #Version 54: 5x5: 0.6
 
 #Version 55: 0.6175 (It seems the downscaling was important.)
+
+#Version 56: 0.6175 (Gated output.)

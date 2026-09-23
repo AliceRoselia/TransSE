@@ -218,7 +218,7 @@ class SqueezeAttention(nn.Module):
 
 net = SqueezeAttention(3, 7).to("cuda")
 
-def gradcam_plot(model, data_loader, limit = 10):
+def gradcam_plot(model, data_loader, limit = 100):
     print("Okay")
     count = 0
     #targets = [ClassifierOutputTarget(2)]
