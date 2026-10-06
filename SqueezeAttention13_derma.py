@@ -173,7 +173,7 @@ class SqueezeAttention(nn.Module):
         self.UP3 = UpProjection(128, 256)
         self.UP4 = UpProjection(256, 512)
         
-        self.dropout = nn.Dropout(0.25)
+        self.dropout = nn.Dropout(0.1)
         
         self.results = nn.Linear(4096, classes)
     @torch.compile()
@@ -285,14 +285,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention8_1.pt")
+            torch.save(net.state_dict(),"Derma_SqueezeAttention11_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention8_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Derma_SqueezeAttention11_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -328,3 +328,9 @@ if __name__ == "__main__":
 #(Approximately) 34.335 Gops, 5.641m params.
 
 #Derma mnist 8 (larger area): 0.8
+
+#Derma mnist 9 (rotate around): 0.7995
+
+#Derma mnist 10 (rotate around 3x3): 0.7935
+
+#Derma mnist 11 (dropout to 0.1): 0.8045
