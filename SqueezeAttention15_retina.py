@@ -244,7 +244,7 @@ hyperparams = [1.00663457e-03, 1.00120680e-02, 1.12677415e-04, 1.02503806e-01,
 #hyperparams = [0.0008602522078379203, 0.012369705667362903, 9.752763156138204e-05, 0.0655110378721131, 0.013811079331863048, 0.010340056669188179, 1.9917593041199128e-05, 0.1769209451676188, 0.007003697900328614, 0.056487999850367676]
 #Let's try a new one.
 
-hyperparams = [0.0005811201660180042, 0.010186128250544161, 7.224494817828703e-05, 0.09919650786263239, 0.013120900307549924, 0.004193814188090797, 2.927567762318058e-05, 0.20923637804401124, 0.005184498596714692, 0.045646415508275744]
+hyperparams = [0.0006729867061284829, 0.009413706933048823, 8.121991512547211e-05, 0.058126115950135414, 0.015485414945547402, 0.0036363227090873843, 2.984296557241922e-05, 0.19917532865830914, 0.003696616602346983, 0.04534038294546077]
 
 
 param_groups = [
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention57_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention58_1.pt")
 
 
 
@@ -331,7 +331,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention57_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention58_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -462,3 +462,5 @@ if __name__ == "__main__":
 #Version 56: 0.6175 (Gated output.)
 
 #Version 57: 0.6325 (Newly tuned parameters.)
+
+#Version 58: 0.615 (Derma-tuned)

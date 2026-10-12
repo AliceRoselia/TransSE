@@ -51,7 +51,7 @@ train_data = BreastMNIST(split="train",transform = transforms.Compose([
     transforms.RandomHorizontalFlip(p=0.5),
     transforms.RandomRotation(15),
     transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15),
-    transforms.RandomResizedCrop(224, scale=(0.9,1.0))
+    #transforms.RandomResizedCrop(224, scale=(0.9,1.0))
 ]),download=True,size = 224)
 train_data_loader = data.DataLoader(dataset = train_data, batch_size = batch_size,shuffle = True,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
@@ -77,7 +77,7 @@ class SqueezeAttentionBlock(nn.Module):
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
-        self.depthwise_conv = nn.Conv2d(n, n, 7, padding = "same",groups=n)
+        self.depthwise_conv = nn.Conv2d(n, n, 5, padding = "same",groups=n)
         self.pointwise_conv = nn.Conv2d(n, n, 1)
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
@@ -252,7 +252,7 @@ hyperparams = [0.0010889095024196832,0.009942881373920073,0.00012181194634217088
  0.009437247084548201,5.167431478097197e-05,0.10057588836850961,0.009492422493706855,0.10705255784270944]
 """
 
-hyperparams = [0.0008602522078379203, 0.012369705667362903, 9.752763156138204e-05, 0.0655110378721131, 0.013811079331863048, 0.010340056669188179, 1.9917593041199128e-05, 0.1769209451676188, 0.007003697900328614, 0.056487999850367676]
+hyperparams = [0.0006729867061284829, 0.009413706933048823, 8.121991512547211e-05, 0.058126115950135414, 0.015485414945547402, 0.0036363227090873843, 2.984296557241922e-05, 0.19917532865830914, 0.003696616602346983, 0.04534038294546077]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=hyperparams[0], weight_decay=hyperparams[1]),
@@ -316,14 +316,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention63_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention67_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention63_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention67_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -478,4 +478,11 @@ if __name__ == "__main__":
 
 #Version 62 (maybe that was unlucky so let's try again.): 0.8589
 
+
 #Version 63: (7x7 with tuned and cropping. ): 0.8846
+
+#Version 64: (5x5, tuned on Derma): 0.8846
+
+#Version 65: (5x5, tuned on Derma, no cropping): 0.8717
+
+#Version 66: (Dropout = 0.5): 0.8461

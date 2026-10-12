@@ -318,3 +318,5 @@ if __name__ == "__main__":
 #Blood mnist 3 (30 epoch, 5x5): 0.9731
 
 #Blood mnist 4 (30 epoch, 3x3): 0.9775
+
+#Blood mnist 5 (30 epoch, 3x3, new hyperparams): 0.9763

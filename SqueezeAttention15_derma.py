@@ -225,7 +225,7 @@ net = SqueezeAttention(3, 7).to("cuda")
 hidden_weights = [p for p in net.parameters() if p.ndim >= 2][1:-1]
 hidden_gains_biases = [p for p in net.parameters() if p.ndim < 2]
 nonhidden_params = [net.intro.weight, net.results.weight]
-hyperparams = [0.0005811201660180042, 0.010186128250544161, 7.224494817828703e-05, 0.09919650786263239, 0.013120900307549924, 0.004193814188090797, 2.927567762318058e-05, 0.20923637804401124, 0.005184498596714692, 0.045646415508275744]
+hyperparams = [0.0006729867061284829, 0.009413706933048823, 8.121991512547211e-05, 0.058126115950135414, 0.015485414945547402, 0.0036363227090873843, 2.984296557241922e-05, 0.19917532865830914, 0.003696616602346983, 0.04534038294546077]
 param_groups = [
     dict(params=hidden_weights, use_muon=True,
          lr=hyperparams[0], weight_decay=hyperparams[1]),
@@ -285,14 +285,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention12_1.pt")
+            torch.save(net.state_dict(),"Derma_SqueezeAttention13_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention12_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Derma_SqueezeAttention13_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -336,3 +336,5 @@ if __name__ == "__main__":
 #Derma mnist 11 (dropout to 0.1): 0.8045
 
 #Derma mnist 12 (tuned value, 5x5, dropout to 0.1): 0.8204
+
+#Derma mnist 13 (tuned with Derma itself): 0.7970
