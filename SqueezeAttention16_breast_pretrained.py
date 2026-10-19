@@ -496,6 +496,6 @@ if __name__ == "__main__":
 
 #Version 70 (retried old tactic): 0.8654
 
-#Version 71 (it seems that 0.8846 is the standard.
+#Version 71 (it seems that 0.8846 is the standard).
 
 #Let's just try tuning the standard. 
