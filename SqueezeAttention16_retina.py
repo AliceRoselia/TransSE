@@ -466,3 +466,5 @@ if __name__ == "__main__":
 #Version 58: 0.615 (Derma-tuned)
 
 #Version 59: 0.59 (Tuned again and only got this.)
+
+#Version 60: 0.64 (It seems the process is a bit random.)
