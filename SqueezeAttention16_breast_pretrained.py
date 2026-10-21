@@ -77,7 +77,7 @@ class SqueezeAttentionBlock(nn.Module):
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
-        self.depthwise_conv = nn.Conv2d(n, n, 5, padding = "same",groups=n)
+        self.depthwise_conv = nn.Conv2d(n, n, 3, padding = "same",groups=n)
         self.pointwise_conv = nn.Conv2d(n, n, 1)
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
@@ -278,8 +278,8 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-#pretrained = torch.load("Retina_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
-#net.load_state_dict(pretrained)
+pretrained = torch.load("Pneumonia_SqueezeAttention13_1.pt") #I think I will try to transfer from pneumonia again, but this one was good. 
+net.load_state_dict(pretrained)
 
 max_epoch = 100
 #muon_max = 0.02
@@ -317,14 +317,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention72_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention73_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention72_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention73_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -499,3 +499,5 @@ if __name__ == "__main__":
 #Version 71 (it seems that 0.8846 is the standard).
 
 #Let's just try tuning the standard. 
+
+#Version 72: 0.8846 (I guess this is the actual accuracy.)

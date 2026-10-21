@@ -70,7 +70,7 @@ class SqueezeAttentionBlock(nn.Module):
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
-        self.depthwise_conv = nn.Conv2d(n, n, 3, padding = "same",groups=n)
+        self.depthwise_conv = nn.Conv2d(n, n, 5, padding = "same",groups=n)
         self.pointwise_conv = nn.Conv2d(n, n, 1)
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
@@ -250,7 +250,7 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-max_epoch = 30
+max_epoch = 40
 
 
 
@@ -285,14 +285,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Blood_SqueezeAttention5_1.pt")
+            torch.save(net.state_dict(),"Blood_SqueezeAttention6_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Blood_SqueezeAttention5_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Blood_SqueezeAttention6_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 

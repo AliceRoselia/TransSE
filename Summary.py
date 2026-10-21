@@ -13,3 +13,6 @@ hyperparams2 = [0.0005811201660180042, 0.010186128250544161, 7.224494817828703e-
 #Blood:  3x3, hyperparams: set 1 (version 4)
 #Pneumonia: 3x3, hyperparams: set 1 (version 12)
 seed = 71909099
+
+
+#Update: Those versions were "lucky" due to noise and all. Hyperparams 2 were better in many ways.
