@@ -77,7 +77,7 @@ class SqueezeAttentionBlock(nn.Module):
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
-        self.depthwise_conv = nn.Conv2d(n, n, 3, padding = "same",groups=n)
+        self.depthwise_conv = nn.Conv2d(n, n, 7, padding = "same",groups=n)
         self.pointwise_conv = nn.Conv2d(n, n, 1)
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
@@ -278,8 +278,8 @@ loss = nn.CrossEntropyLoss()
 
 best = 0
 
-pretrained = torch.load("Pneumonia_SqueezeAttention13_1.pt") #I think I will try to transfer from pneumonia again, but this one was good. 
-net.load_state_dict(pretrained)
+#pretrained = torch.load("Pneumonia_SqueezeAttention13_1.pt") #I think I will try to transfer from pneumonia again, but this one was good. 
+#net.load_state_dict(pretrained)
 
 max_epoch = 100
 #muon_max = 0.02

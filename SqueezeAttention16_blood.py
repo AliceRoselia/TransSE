@@ -320,3 +320,5 @@ if __name__ == "__main__":
 #Blood mnist 4 (30 epoch, 3x3): 0.9775
 
 #Blood mnist 5 (30 epoch, 3x3, new hyperparams): 0.9763
+
+#Blood mnist 6: 0.9752 (Accept. Not a significant regression.)
