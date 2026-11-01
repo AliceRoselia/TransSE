@@ -77,7 +77,7 @@ class SqueezeAttentionBlock(nn.Module):
         self.heads = head
         self.value_conv = nn.Conv2d(n, n, 1)
         self.bn1 = nn.BatchNorm2d(m*n)
-        self.depthwise_conv = nn.Conv2d(n, n, 7, padding = "same",groups=n)
+        self.depthwise_conv = nn.Conv2d(n, n, 5, padding = "same",groups=n)
         self.pointwise_conv = nn.Conv2d(n, n, 1)
         #self.pw_conv = nn.Conv2d(n,n,1,padding = "same")
         self.bn2 = nn.BatchNorm2d(m*n)
@@ -317,14 +317,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention73_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention78_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention73_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention78_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -501,3 +501,13 @@ if __name__ == "__main__":
 #Let's just try tuning the standard. 
 
 #Version 72: 0.8846 (I guess this is the actual accuracy.)
+
+#Version 73: 0.8846
+
+#Version 74 (adjusting epsilon); 0.8782
+
+#Version 75 (adjusting epsilon): 0.8782
+
+#Version 76: 0.8654
+
+#Version 77: 0.8782
