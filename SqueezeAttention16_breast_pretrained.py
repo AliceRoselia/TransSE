@@ -511,3 +511,5 @@ if __name__ == "__main__":
 #Version 76: 0.8654
 
 #Version 77: 0.8782
+
+#Version 78 (heavy augmentation): 0.8526 FAILED!
