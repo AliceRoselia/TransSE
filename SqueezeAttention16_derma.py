@@ -80,7 +80,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.silu(self.pointwise_conv(func.silu(self.depthwise_conv(x))))
+        return x + func.mish(self.pointwise_conv(func.mish(self.depthwise_conv(x))))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
