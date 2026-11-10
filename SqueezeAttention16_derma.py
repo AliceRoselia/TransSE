@@ -80,7 +80,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.mish(self.pointwise_conv(func.mish(self.depthwise_conv(x))))
+        return x + func.swish(self.pointwise_conv(func.swish(self.depthwise_conv(x))))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
@@ -285,14 +285,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Derma_SqueezeAttention14_1.pt")
+            torch.save(net.state_dict(),"Derma_SqueezeAttention15_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Derma_SqueezeAttention14_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Derma_SqueezeAttention15_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -338,3 +338,5 @@ if __name__ == "__main__":
 #Derma mnist 12 (tuned value, 5x5, dropout to 0.1): 0.8204
 
 #Derma mnist 13 (tuned with Derma itself): 0.7970
+
+#Derma mnist 14 (mish): 0.7825

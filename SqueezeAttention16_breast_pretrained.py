@@ -87,7 +87,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.mish(self.pointwise_conv(func.mish(self.depthwise_conv(x))))
+        return x + func.swish(self.pointwise_conv(func.swish(self.depthwise_conv(x))))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
@@ -317,14 +317,14 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Breast_SqueezeAttention79_1.pt")
+            torch.save(net.state_dict(),"Breast_SqueezeAttention80_1.pt")
 
 
 
 #This section is deliberately separate in case we want to just evaluate the model.
 
 if __name__ == "__main__":
-    pretrained = torch.load("Breast_SqueezeAttention79_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Breast_SqueezeAttention80_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 

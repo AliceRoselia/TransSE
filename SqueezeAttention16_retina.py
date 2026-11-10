@@ -89,7 +89,7 @@ class SqueezeAttentionBlock(nn.Module):
     
     #@torch.compile()
     def fused_conv_activation(self,x):
-        return x + func.silu(self.pointwise_conv(func.silu(self.depthwise_conv(x))))
+        return x + func.swish(self.pointwise_conv(func.swish(self.depthwise_conv(x))))
     
     #def convs(self,x):
         #return self.pw_conv(self.dw_conv(x))
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         if correct > best:
             best = correct
             print("New frontier reached.")
-            torch.save(net.state_dict(),"Retina_SqueezeAttention60_1.pt")
+            torch.save(net.state_dict(),"Retina_SqueezeAttention62_1.pt")
 
 
 
@@ -331,7 +331,7 @@ test_data_loader = data.DataLoader(dataset = test_data, batch_size = batch_size,
 pin_memory=True,num_workers=num_workers,prefetch_factor=prefetch_factor,persistent_workers=True)
 
 if __name__ == "__main__":
-    pretrained = torch.load("Retina_SqueezeAttention60_1.pt") #Let's get up to 10 epochs?
+    pretrained = torch.load("Retina_SqueezeAttention62_1.pt") #Let's get up to 10 epochs?
     net.load_state_dict(pretrained)
 
 
@@ -468,3 +468,5 @@ if __name__ == "__main__":
 #Version 59: 0.59 (Tuned again and only got this.)
 
 #Version 60: 0.64 (It seems the process is a bit random.)
+
+#Version 61: (Actually, stoppable before epoch 20 but trained to 100 epochs ): 0.6175
